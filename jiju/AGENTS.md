@@ -34,7 +34,7 @@
    |---------------------------|---------------|-------------------------------------------|
    | `CHECKPOINTS.md`          | leader        | mecánico, desde `harness.json`            |
    | `docs/verification.md` (comando de tests) | leader | mecánico, desde `harness.json`     |
-   | `docs/specs.md` (ejemplos)| leader        | mecánico, ajustado al `test_cmd` del stack |
+   | `docs/specs.md` (ejemplos)| leader        | ejemplo EARS ilustrativo con la invocación del stack (sin entrevista) |
    | `docs/architecture.md`    | explorer (brownfield) / leader+humano (greenfield) | código existente o respuestas del humano |
    | `docs/conventions.md`     | explorer (brownfield) / leader+humano (greenfield) | código existente o respuestas del humano |
    | `docs/verification.md` (ejemplos de integración) | leader+humano | dominio del proyecto |

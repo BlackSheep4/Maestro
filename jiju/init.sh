@@ -103,18 +103,29 @@ python3 - <<'PY'
 import json, os, sys
 try:
     data = json.load(open("feature_list.json"))
-    valid = {"pending", "spec_ready", "in_progress", "done", "blocked"}
+    # Fuente única de verdad: las reglas las declara el propio feature_list.json
+    # en su bloque `rules`. init.sh las RESPETA en lugar de hardcodearlas, para
+    # que no haya dos fuentes que puedan divergir. Fallback a los valores
+    # canónicos si no existe el bloque `rules`.
+    rules = data.get("rules", {})
+    valid = set(rules.get("valid_status")
+                or {"pending", "spec_ready", "in_progress", "done", "blocked"})
+    one_at_a_time = rules.get("one_feature_at_a_time", True)
     in_progress = [f for f in data["features"] if f["status"] == "in_progress"]
-    if len(in_progress) > 1:
-        print(f"[FAIL]  Hay {len(in_progress)} features en in_progress (máximo 1)")
+    if one_at_a_time and len(in_progress) > 1:
+        print(f"[FAIL]  Hay {len(in_progress)} features en in_progress "
+              f"(rules.one_feature_at_a_time exige máximo 1)")
         sys.exit(1)
+    # require_tests_to_close se honra ejecutando siempre los tests en el bloque 4
+    # (y el reviewer/leader bloquean `done` con init.sh en rojo).
+    require_spec = rules.get("require_approved_spec_to_implement", True)
     requires_spec = {"spec_ready", "in_progress", "done"}
     spec_errors = []
     for f in data["features"]:
         if f["status"] not in valid:
             print(f"[FAIL]  Estado inválido en feature {f['id']}: {f['status']}")
             sys.exit(1)
-        if f.get("sdd") and f["status"] in requires_spec:
+        if require_spec and f.get("sdd") and f["status"] in requires_spec:
             spec_dir = os.path.join("specs", f["name"])
             for fname in ("requirements.md", "design.md", "tasks.md"):
                 if not os.path.isfile(os.path.join(spec_dir, fname)):
@@ -145,10 +156,11 @@ TEST_CMD=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['
 
 if [ ! -d "$TEST_DIR" ]; then
   warn "Carpeta $TEST_DIR/ no existe todavía"
-elif [ -z "$(find "$TEST_DIR" -type f ! -name '.*' 2>/dev/null | head -1)" ]; then
-  # Greenfield recién inicializado: el directorio de tests existe pero está
-  # vacío. No es un fallo — todavía no hay nada que ejecutar. (pytest, por
-  # ejemplo, saldría con código 5 "no tests collected" y lo marcaría en rojo.)
+elif [ -z "$(find "$TEST_DIR" -type f ! -name '.*' ! -name '__init__.py' ! -name 'conftest.py' 2>/dev/null | head -1)" ]; then
+  # Greenfield recién inicializado: el directorio de tests existe pero solo
+  # contiene scaffolding (o nada). No es un fallo — todavía no hay tests que
+  # ejecutar. (pytest saldría con código 5 "no tests collected" y lo marcaría
+  # en rojo aunque no haya nada roto.)
   warn "Carpeta $TEST_DIR/ existe pero no contiene tests todavía"
 elif bash -c "$TEST_CMD" 2>&1; then
   ok "Todos los tests pasan"

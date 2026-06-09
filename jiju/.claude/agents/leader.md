@@ -111,12 +111,11 @@ en archivos** (no en su respuesta de texto). Tú solo recibes referencias
 del tipo: "resultado en `progress/impl_<name>.md`" o
 "`spec_ready -> specs/<name>/`".
 
-> **En este repo en práctica:** tras una sesión real los informes quedan en
-> `progress/impl_<feature>.md` (implementer) y
-> `progress/review_<feature>.md` (reviewer), y el spec en
+> **En la práctica:** los informes quedan en `progress/impl_<feature>.md`
+> (implementer) y `progress/review_<feature>.md` (reviewer), y el spec en
 > `specs/<feature>/`. Tú, como líder, nunca verás su contenido en chat
-> — solo una referencia. Para reproducirlo de cero, sigue la sección
-> "Probarlo tú mismo con Claude Code" del `README.md`.
+> — solo una referencia. Para el flujo completo paso a paso, ver la sección
+> "Trabajar con Claude Code" del `README.md`.
 
 ## Escalado de esfuerzo
 

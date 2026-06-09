@@ -84,14 +84,15 @@ modo GREENFIELD para generarlo, y luego evalúa `src_dir`.)
 
 3. Escribe `harness.json` en la raíz del proyecto.
 
-4. **Rellena los `HARNESS:FILL` mecánicos tras generar `harness.json`:** hay
-   secciones `FILL` que se derivan directamente de `harness.json` y no
-   requieren preguntar al humano. Rellénalas usando `src_dir`, `test_dir` y
+4. **Rellena los `HARNESS:FILL` que NO requieren preguntar al humano tras
+   generar `harness.json`:** se completan a partir de `harness.json` y del
+   patrón del stack, sin entrevista. Rellénalas usando `src_dir`, `test_dir` y
    `test_cmd`:
-   - `CHECKPOINTS.md` (items de C3 y C4).
-   - `docs/verification.md` (comando de tests del Nivel 1).
-   - `docs/specs.md` (ajusta los ejemplos de `requirements.md`/`tasks.md` al
-     comando real del stack).
+   - `CHECKPOINTS.md` (items de C3 y C4) — derivado directo de `harness.json`.
+   - `docs/verification.md` (comando de tests del Nivel 1) — derivado directo.
+   - `docs/specs.md` (ejemplos de `requirements.md`/`tasks.md`) — ejemplo
+     ilustrativo escrito con la invocación real del stack (p. ej. `pytest`,
+     `go test`); no copia un dominio concreto, solo muestra la sintaxis EARS.
    Los `FILL` que dependen del dominio (`docs/architecture.md`,
    `docs/conventions.md`, ejemplos de integración de `docs/verification.md`) se
    rellenan preguntando al humano — ver la tabla de reparto en `AGENTS.md` §1.
