@@ -129,20 +129,28 @@ VALID_CSV=${VALID_CSV:-pending,spec_ready,in_progress,done,blocked}
 ONE_AT_A_TIME=$(jget feature_list.json '(.rules.one_feature_at_a_time | if . == null then true else . end | tostring)' \
   "str(d.get('rules',{}).get('one_feature_at_a_time', True)).lower()" 2>/dev/null)
 ONE_AT_A_TIME=${ONE_AT_A_TIME:-true}
-REQUIRE_SPEC=$(jget feature_list.json '(.rules.require_approved_spec_to_implement | if . == null then true else . end | tostring)' \
-  "str(d.get('rules',{}).get('require_approved_spec_to_implement', True)).lower()" 2>/dev/null)
-REQUIRE_SPEC=${REQUIRE_SPEC:-true}
 REQUIRE_TESTS=$(jget feature_list.json '(.rules.require_tests_to_close | if . == null then true else . end | tostring)' \
   "str(d.get('rules',{}).get('require_tests_to_close', True)).lower()" 2>/dev/null)
 REQUIRE_TESTS=${REQUIRE_TESTS:-true}
+# Nota: rules.require_approved_spec_to_implement es una regla de WORKFLOW (no
+# implementar sin spec aprobado por un humano). init.sh no puede verificar
+# "aprobado" — no hay registro de la aprobación. La hace cumplir el leader
+# (puerta spec_ready). Lo que init.sh SÍ verifica es la invariante de datos
+# derivada: toda feature `sdd: true` no-pending tiene sus 3 ficheros de spec.
+# La exclusión por-feature de SDD es `sdd: false`, no un flag global.
 
+# Emite una línea por feature: id␟status␟name␟sdd. El separador es \x1f (unit
+# separator), NO un tab: read trata el tab como whitespace y colapsa campos
+# vacíos consecutivos, lo que desalinea una feature con un campo null. \x1f es
+# no-whitespace, así que un campo vacío se preserva como campo vacío.
 feat_lines() {
   if [ "$JSON_TOOL" = "jq" ]; then
-    jq -r '.features[] | [(.id|tostring), .status, .name, ((.sdd // false)|tostring)] | @tsv' feature_list.json
+    jq -r '.features[] | [((.id // "")|tostring), (.status // ""), (.name // ""), ((.sdd // false)|tostring)] | join("\u001f")' feature_list.json
   else
     python3 -c "import json
+SEP='\x1f'
 for f in json.load(open('feature_list.json'))['features']:
-    print('\t'.join([str(f['id']), f['status'], f['name'], str(bool(f.get('sdd'))).lower()]))"
+    print(SEP.join([str(f.get('id','')), f.get('status') or '', f.get('name') or '', str(bool(f.get('sdd'))).lower()]))"
   fi
 }
 
@@ -154,14 +162,19 @@ else
   invalid_found=0
   in_progress_count=0
   spec_missing=0
-  while IFS=$(printf '\t') read -r id status name sdd; do
-    [ -n "${status:-}" ] || continue
+  while IFS=$(printf '\037') read -r id status name sdd; do
+    [ -n "$id$status$name$sdd" ] || continue
+    if [ -z "$id" ] || [ -z "$status" ] || [ -z "$name" ]; then
+      fail "feature malformada (faltan id/status/name): id='$id' status='$status' name='$name'"
+      invalid_found=1
+      continue
+    fi
     case ",$VALID_CSV," in
       *",$status,"*) ;;
       *) fail "Estado inválido en feature $id: $status"; invalid_found=1 ;;
     esac
     [ "$status" = "in_progress" ] && in_progress_count=$((in_progress_count + 1))
-    if [ "$REQUIRE_SPEC" = "true" ] && [ "$sdd" = "true" ]; then
+    if [ "$sdd" = "true" ]; then
       case "$status" in
         spec_ready|in_progress|done)
           for fname in requirements.md design.md tasks.md; do

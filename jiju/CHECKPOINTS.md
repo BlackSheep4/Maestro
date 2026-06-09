@@ -18,7 +18,8 @@
 
 ## C2 — El estado es coherente
 
-- [ ] Como mucho una feature en `in_progress` en `feature_list.json`.
+- [ ] Como mucho una feature en `in_progress` en `feature_list.json`
+      (a menos que `rules.one_feature_at_a_time` sea `false`; init.sh respeta ese flag).
 - [ ] Toda feature `done` tiene tests asociados que pasan.
 - [ ] `progress/current.md` está vacío o describe la sesión activa
       (no contiene basura de sesiones anteriores).
