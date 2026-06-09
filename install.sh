@@ -8,14 +8,16 @@
 #   MAESTRO_HOME       destino (por defecto ~/.maestro)
 #   MAESTRO_REF        rama/tag/sha del repo a instalar (por defecto la rama por defecto)
 #   MAESTRO_REPO       owner/repo (por defecto BlackSheep4/Maestro)
-#   MAESTRO_LOCAL_SRC  instala desde un directorio jiju/ local en vez de descargar
+#   MAESTRO_LOCAL_SRC  instala desde un clon local del harness en vez de descargar
+#   MAESTRO_SUBDIR     subdirectorio del repo donde vive el harness (por defecto la raíz)
 
 set -eu
 
 MAESTRO_REPO="${MAESTRO_REPO:-BlackSheep4/Maestro}"
 MAESTRO_REF="${MAESTRO_REF:-harness-sdd-uncle-bob}"
 MAESTRO_HOME="${MAESTRO_HOME:-$HOME/.maestro}"
-SUBDIR="jiju"
+# Subdirectorio del repo donde vive el harness. Vacío = raíz del repo.
+SUBDIR="${MAESTRO_SUBDIR:-}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; CYAN=$'\033[0;36m'; YELLOW=$'\033[0;33m'; BOLD=$'\033[1m'; NC=$'\033[0m'
@@ -71,7 +73,10 @@ else
   download "https://codeload.github.com/$MAESTRO_REPO/tar.gz/$MAESTRO_REF" "$TMP/maestro.tar.gz"
   tar -xzf "$TMP/maestro.tar.gz" -C "$TMP"
   SRC=""
-  for d in "$TMP"/*/; do SRC="${d%/}/$SUBDIR"; break; done
+  for d in "$TMP"/*/; do
+    if [ -n "$SUBDIR" ]; then SRC="${d%/}/$SUBDIR"; else SRC="${d%/}"; fi
+    break
+  done
 fi
 
 [ -d "$SRC" ] || { err "No encuentro el harness en '$SRC'."; exit 1; }
