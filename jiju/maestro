@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+# maestro — CLI del harness de Claude Code (bash puro, sin dependencias de Node).
+#
+# Se instala en ~/.maestro/bin/maestro vía install.sh. Los ficheros del harness
+# viven en ~/.maestro/templates/ y `maestro init` los copia al proyecto.
+#
+# Sin argumentos, muestra la ayuda.
+
+set -u
+
+MAESTRO_VERSION="1.0.0"
+MAESTRO_HOME="${MAESTRO_HOME:-$HOME/.maestro}"
+TEMPLATES="$MAESTRO_HOME/templates"
+SEP="────────────────────────────────────────────────────"
+
+# ── Colores (se desactivan si no hay tty o si NO_COLOR está puesto) ──
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'
+  CYAN=$'\033[0;36m'; GRAY=$'\033[0;90m'; BOLD=$'\033[1m'; NC=$'\033[0m'
+else
+  RED=''; GREEN=''; YELLOW=''; CYAN=''; GRAY=''; BOLD=''; NC=''
+fi
+
+ok()   { printf '%s✅ %s%s\n' "$GREEN" "$1" "$NC"; }
+err()  { printf '%s❌ %s%s\n' "$RED" "$1" "$NC" >&2; }
+info() { printf '%sℹ %s%s\n'  "$CYAN" "$1" "$NC"; }
+warn() { printf '%s⚠ %s%s\n'  "$YELLOW" "$1" "$NC"; }
+
+# ── Parser JSON: jq (preferido) o python3, igual que init.sh ──
+JT=""
+json_tool() {
+  if [ -n "$JT" ]; then printf '%s' "$JT"; return; fi
+  if command -v jq >/dev/null 2>&1; then JT="jq"
+  elif command -v python3 >/dev/null 2>&1; then JT="python3"
+  else JT="none"; fi
+  printf '%s' "$JT"
+}
+
+# fl <jq_filter> <python_expr> — extrae un escalar de feature_list.json.
+fl() {
+  if [ "$(json_tool)" = "jq" ]; then
+    jq -r "$1" feature_list.json
+  else
+    python3 -c "import json
+d=json.load(open('feature_list.json'))
+v=$2
+print('' if v is None else v)"
+  fi
+}
+
+# fl_lines — una línea por feature: id␟status␟name␟sdd (separador \x1f, no-tab,
+# para que un campo vacío no desalinee los demás).
+fl_lines() {
+  if [ "$(json_tool)" = "jq" ]; then
+    jq -r '.features[] | [((.id // "")|tostring),(.status // ""),(.name // ""),((.sdd // false)|tostring)] | join("\u001f")' feature_list.json
+  else
+    python3 -c "import json
+SEP='\x1f'
+for f in json.load(open('feature_list.json'))['features']:
+    print(SEP.join([str(f.get('id','')), f.get('status') or '', f.get('name') or '', str(bool(f.get('sdd'))).lower()]))"
+  fi
+}
+
+# fl_counts — 'total done in_progress pending blocked spec_ready' (números).
+fl_counts() {
+  if [ "$(json_tool)" = "jq" ]; then
+    jq -r '.features as $f | [($f|length),
+      ([$f[]|select(.status=="done")]|length),
+      ([$f[]|select(.status=="in_progress")]|length),
+      ([$f[]|select(.status=="pending")]|length),
+      ([$f[]|select(.status=="blocked")]|length),
+      ([$f[]|select(.status=="spec_ready")]|length)] | join(" ")' feature_list.json
+  else
+    python3 -c "import json
+f=json.load(open('feature_list.json'))['features']
+c=lambda s:sum(1 for x in f if x.get('status')==s)
+print(len(f),c('done'),c('in_progress'),c('pending'),c('blocked'),c('spec_ready'))"
+  fi
+}
+
+# ── Detección greenfield/brownfield ──
+detect_mode() {
+  local found
+  found=$(find . -mindepth 1 \
+    \( -type d \( -name '.*' -o -name node_modules \) -prune \) -o \
+    \( -type f \( -name '*.py' -o -name '*.js' -o -name '*.ts' -o -name '*.go' \
+       -o -name '*.rs' -o -name '*.java' -o -name '*.rb' -o -name '*.php' \) -print \) \
+    2>/dev/null | head -n1)
+  [ -n "$found" ] && echo "brownfield" || echo "greenfield"
+}
+
+usage() {
+  cat <<EOF
+${BOLD}maestro${NC} — harness de Claude Code para desarrollo autónomo y SDD (v$MAESTRO_VERSION)
+
+Uso: ${BOLD}maestro${NC} <comando>
+
+Comandos:
+  ${GREEN}init${NC}       Instala el harness en el directorio actual
+  ${GREEN}status${NC}     Muestra el estado de las features del proyecto
+  ${GREEN}check${NC}      Ejecuta ./init.sh y propaga su exit code (apto para CI)
+  ${GREEN}upgrade${NC}    (próximamente) Actualiza el harness preservando tu contenido
+  ${GREEN}version${NC}    Muestra la versión de maestro
+  ${GREEN}help${NC}       Muestra esta ayuda
+
+Sin argumentos, maestro muestra esta ayuda.
+
+Más info: https://github.com/BlackSheep4/Maestro
+EOF
+}
+
+# ── Comando: init ──
+cmd_init() {
+  if [ -f AGENTS.md ]; then
+    err 'Maestro ya está instalado en este directorio. Usa "maestro upgrade" para actualizar.'
+    exit 1
+  fi
+  if [ ! -d "$TEMPLATES" ]; then
+    err "No encuentro los templates en $TEMPLATES. ¿Instalaste maestro con el script oficial (install.sh)?"
+    exit 1
+  fi
+
+  local mode; mode=$(detect_mode)
+  if [ "$mode" = "brownfield" ]; then
+    info 'Proyecto existente detectado (brownfield). El harness se instalará sin sobreescribir tu código.'
+  else
+    info 'Proyecto nuevo detectado (greenfield). El harness se instalará completo.'
+  fi
+
+  local copied=() rel
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if [ -e "$rel" ]; then continue; fi          # nunca pisa nada existente
+    mkdir -p "$(dirname "$rel")"
+    cp "$TEMPLATES/$rel" "$rel"
+    copied+=("$rel")
+  done < <(cd "$TEMPLATES" && find . -type f | sed 's|^\./||' | sort)
+
+  local f
+  for f in init.sh .claude/hooks/after_edit.sh .claude/hooks/before_stop.sh; do
+    [ -f "$f" ] && chmod +x "$f"
+  done
+
+  printf '%s\n' "$MAESTRO_VERSION" > .maestro-version
+  copied+=(".maestro-version")
+
+  echo
+  ok "Maestro v$MAESTRO_VERSION instalado correctamente."
+  echo
+  echo "Modo: $mode"
+  echo
+  echo "Ficheros creados:"
+  for f in "${copied[@]}"; do printf '%s  %s%s\n' "$GRAY" "$f" "$NC"; done
+  echo
+  echo "Siguiente paso:"
+  echo "  Abre Claude Code en este directorio: claude"
+  echo "  El agente completará la configuración del stack (harness.json)"
+  echo "  y el onboarding del proyecto automáticamente."
+}
+
+# ── Comando: status ──
+cmd_status() {
+  if [ ! -f feature_list.json ]; then
+    err 'No se encontró feature_list.json. ¿Está Maestro instalado? Ejecuta "maestro init".'
+    exit 1
+  fi
+  if [ "$(json_tool)" = "none" ]; then
+    err 'Necesito jq o python3 para leer feature_list.json.'
+    exit 1
+  fi
+
+  local count
+  count=$(fl '.features | length' "len(d['features'])" 2>/dev/null)
+  if ! printf '%s' "$count" | grep -qE '^[0-9]+$'; then
+    err 'feature_list.json no es válido.'
+    exit 1
+  fi
+  if [ "$count" -eq 0 ]; then
+    info 'No hay features definidas todavía. Abre Claude Code para iniciar el onboarding.'
+    return
+  fi
+
+  local project
+  project=$(fl '.project // "(sin nombre)"' "d.get('project') or '(sin nombre)'" 2>/dev/null)
+
+  printf '%sProyecto: %s%s\n' "$BOLD" "$project" "$NC"
+  echo "$SEP"
+  printf ' %-3s %-16s %-4s %s\n' '#' 'Status' 'SDD' 'Nombre'
+  echo "$SEP"
+
+  local id status name sdd icon color sddmark cell
+  while IFS=$(printf '\037') read -r id status name sdd; do
+    [ -n "$id$status$name" ] || continue
+    case "$status" in
+      done)        icon='✅'; color="$GREEN" ;;
+      in_progress) icon='🟡'; color="$YELLOW" ;;
+      pending)     icon='⬜'; color="$GRAY" ;;
+      blocked)     icon='🔴'; color="$RED" ;;
+      spec_ready)  icon='🔵'; color="$CYAN" ;;
+      *)           icon='  '; color="$NC" ;;
+    esac
+    sddmark='—'; [ "$sdd" = "true" ] && sddmark='●'
+    cell=$(printf '%s %s' "$icon" "$status")
+    printf ' %-3s %s%-16s%s %-4s %s\n' "$id" "$color" "$cell" "$NC" "$sddmark" "$name"
+  done < <(fl_lines)
+
+  echo "$SEP"
+
+  local nums; nums=$(fl_counts)
+  set -- $nums
+  local total="$1" d="$2" ip="$3" pe="$4" bl="$5" sr="$6"
+  local footer="Total: $total features"
+  [ "$d"  -gt 0 ] 2>/dev/null && footer="$footer | $d done"
+  [ "$ip" -gt 0 ] 2>/dev/null && footer="$footer | $ip in_progress"
+  [ "$pe" -gt 0 ] 2>/dev/null && footer="$footer | $pe pending"
+  [ "$bl" -gt 0 ] 2>/dev/null && footer="$footer | $bl blocked"
+  [ "$sr" -gt 0 ] 2>/dev/null && footer="$footer | $sr spec_ready"
+  echo "$footer"
+
+  local ipname
+  ipname=$(fl '[.features[]|select(.status=="in_progress")][0].name // ""' \
+    "next((x['name'] for x in d['features'] if x.get('status')=='in_progress'), '')" 2>/dev/null)
+  if [ -n "$ipname" ]; then
+    echo
+    echo "En curso: $ipname"
+    [ -d "specs/$ipname" ] && echo "Spec: specs/$ipname/"
+    [ -f "progress/impl_$ipname.md" ] && echo "Progreso: progress/impl_$ipname.md"
+  fi
+}
+
+# ── Comando: check ──
+cmd_check() {
+  if [ ! -f init.sh ]; then
+    err 'No se encontró init.sh. ¿Está Maestro instalado?'
+    exit 1
+  fi
+  if [ ! -x init.sh ]; then
+    warn 'init.sh no tenía permisos de ejecución. Corregido automáticamente.'
+    chmod +x init.sh
+  fi
+  local code
+  if ./init.sh; then code=0; else code=$?; fi   # streaming directo + exit code
+  echo
+  if [ "$code" -eq 0 ]; then
+    ok 'Harness listo. Todos los checks pasaron.'
+  else
+    err 'El harness tiene errores. Revisa la salida anterior.'
+  fi
+  exit "$code"
+}
+
+# ── Dispatch ──
+cmd="${1:-help}"
+case "$cmd" in
+  init)               shift; cmd_init "$@" ;;
+  status)             shift; cmd_status "$@" ;;
+  check)              shift; cmd_check "$@" ;;
+  upgrade)            err 'maestro upgrade aún no está disponible en esta versión (próximamente).'; exit 1 ;;
+  version|-v|--version) echo "maestro v$MAESTRO_VERSION" ;;
+  help|-h|--help)     usage ;;
+  *)                  err "Comando desconocido: $cmd"; echo; usage; exit 1 ;;
+esac
