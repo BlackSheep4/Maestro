@@ -1,143 +1,120 @@
-# Harness SDD — plantilla genérica
+<p align="center">
+  <img src="assets/maestro-banner.png" alt="Maestro" width="420">
+</p>
 
-Plantilla de **arnés (harness)** para desarrollar cualquier proyecto con
-agentes de IA aplicando **Spec Driven Development**. No es una aplicación: es
-el andamiaje que envuelve a tu código para que un agente trabaje sobre él de
-forma autónoma, verificable y reproducible desde la primera sesión.
+<h1 align="center">Maestro</h1>
 
-> Esta rama es la **plantilla limpia**: no trae código de aplicación. `src/`,
-> `tests/` y `specs/` están vacíos, `feature_list.json` no tiene features y
-> `harness.json` no existe todavía — **lo genera el agente** en la primera
-> sesión (onboarding). A partir de ahí el arnés se puebla solo, feature a
-> feature.
+<p align="center">
+  <b>Spec-Driven Agent Orchestration Framework</b><br>
+  Un arnés (<i>harness</i>) para Claude Code que hace que los agentes de IA trabajen de forma
+  <b>autónoma, verificable y disciplinada</b> sobre cualquier proyecto.
+</p>
 
-El arnés es **políglota**: el stack (lenguaje, versión mínima, comando de
-tests, rutas) vive en `harness.json` y `init.sh` lo lee de ahí. Sirve igual
-para Python, Node, Go o Rust. Para parsear su propia configuración JSON,
-`init.sh` usa **`jq` o `python3`** (cualquiera de los dos; detecta el que esté
-disponible), así que no impone un runtime concreto a tu proyecto.
+<p align="center">
+  <a href="https://github.com/BlackSheep4/Maestro/wiki"><b>📖 Documentación completa (Wiki)</b></a>
+</p>
 
-## Cómo está organizado el arnés
+---
 
-| Pilar                                  | Manifestación en este repo                                                       |
-|----------------------------------------|----------------------------------------------------------------------------------|
-| **1. El repositorio ES el sistema**    | `AGENTS.md`, `init.sh`, `feature_list.json`, `specs/`, `progress/`, `docs/`      |
-| **2. Orquestación multi-agente**       | `.claude/agents/leader.md`, `spec_author.md`, `implementer.md`, `reviewer.md`, `explorer.md` |
-| **3. Spec Driven Development**         | `docs/specs.md`, EARS notation, puerta de aprobación humana en `spec_ready`      |
-| **4. Supervisión y mejora**            | `CHECKPOINTS.md`, hooks en `.claude/settings.json` (+`.claude/hooks/`), `init.sh`|
+## ¿Qué es Maestro?
 
-## Para empezar
+**Maestro** no es una aplicación: es una **capa de control y orquestación** que envuelve a
+los agentes de IA para que dejen de improvisar y empiecen a trabajar como un equipo
+disciplinado. Se apoya en cuatro pilares:
 
-Abre Claude Code en la raíz del repo y pídele que arranque. El agente actúa
-como `leader` (lo fuerza `CLAUDE.md`) y ejecuta el **protocolo de onboarding**:
+1. **El repositorio ES el sistema de control.** El estado vive en disco y en Git
+   (`AGENTS.md`, `feature_list.json`, `progress/`, `docs/`), nunca en el chat ni en la
+   memoria del agente.
+2. **Orquestación multi-agente con roles separados.** Cuatro subagentes con restricciones
+   asimétricas: `leader` (orquesta, no codifica), `spec_author` (escribe specs, no toca
+   código), `implementer` (ejecuta, no se autoaprueba), `reviewer` (verifica, no edita).
+3. **Spec Driven Development (SDD).** Flujo `pending → spec_ready → in_progress → done` con
+   una puerta de aprobación humana obligatoria y requirements en notación EARS antes de
+   tocar código.
+4. **Verificación ejecutable.** `init.sh` como árbitro objetivo, trazabilidad
+   `R<n> → test` obligatoria, y hooks que ejecutan los tests tras cada edición.
 
-1. Como `harness.json` no existe, te hace 3 preguntas de stack (lenguaje y
-   versión mínima, comando de tests, rutas de código y tests) y genera
-   `harness.json` por ti, consultando `harness.example.json` como referencia.
-2. Rellena automáticamente las secciones `HARNESS:FILL` mecánicas de los `docs/`
-   y `CHECKPOINTS.md` con los valores del stack.
-3. Detecta el modo:
-   - **Greenfield** (sin código en `src_dir`): te pregunta qué feature quieres
-     construir primero y la inscribe como `pending` en `feature_list.json`.
-   - **Brownfield** (ya hay código): lanza el `explorer`, que infiere las
-     features existentes, te las propone y —tras tu aprobación— escribe el
-     `feature_list.json` inicial.
-4. Ejecuta `./init.sh`, que debe terminar en verde.
+Es **políglota**: el stack (lenguaje, comando de tests, rutas) vive en `harness.json`, así
+que sirve igual para Python, Node, Go o Rust. No impone Node a tu proyecto — el CLI es
+bash puro y lee JSON con `jq` o `python3`.
 
-`./init.sh` se puede ejecutar a mano una vez exista `harness.json`; antes de
-eso falla a propósito y te remite al onboarding.
+## Instalación
 
-## Trabajar con Claude Code
-
-Con `harness.json` generado y al menos una feature `pending`, pídele:
-**«implementa la siguiente feature pendiente»**. El flujo ocurre en dos fases
-con una **puerta de aprobación humana** entre ellas:
-
-**Fase 1 — Spec.** El `leader` lanza un `spec_author` que escribe
-`specs/<feature>/{requirements.md, design.md, tasks.md}` y deja la feature en
-`spec_ready`. Luego **para y te pide aprobación**.
-
-Tú lees los tres archivos en tu editor:
-
-- `requirements.md` — qué debe hacer la feature, en EARS estricto.
-- `design.md` — decisiones técnicas antes de escribir código.
-- `tasks.md` — checklist de pasos discretos a ejecutar.
-
-Cuando estés conforme, dices al chat «aprobado» (o pides cambios).
-
-**Fase 2 — Código.** El `leader` transiciona la feature a `in_progress` y
-lanza `implementer` (sigue las tasks una a una marcándolas `[x]`) y después
-`reviewer` (verifica trazabilidad `R<n>` ↔ test y todas las tasks completas).
-Si el `reviewer` aprueba, **el leader** marca la feature `done` y vuelca el
-resumen a `progress/history.md`.
-
-Dónde queda la traza de cada subagente:
-
-| Archivo                                  | Quién lo escribe   | Qué contiene                                                  |
-|------------------------------------------|--------------------|---------------------------------------------------------------|
-| `specs/<feature>/requirements.md`        | spec_author        | EARS requirements numeradas `R1`, `R2`, ...                  |
-| `specs/<feature>/design.md`              | spec_author        | Decisiones técnicas + alternativa descartada                  |
-| `specs/<feature>/tasks.md`               | spec_author        | Checklist; el implementer la va marcando `[x]`                |
-| `progress/spec_interview_<feature>.md`   | spec_author        | Preguntas de clarificación y respuestas del humano (si las hubo) |
-| `progress/current.md`                    | leader             | Plan vivo de la sesión                                        |
-| `progress/impl_<feature>.md`             | implementer        | Archivos tocados + mapa `R<n> → test` + output de los tests   |
-| `progress/review_<feature>.md`           | reviewer           | Checklist contra `docs/`, `specs/<feature>/` y `CHECKPOINTS.md` |
-| `progress/explorer_brownfield.md`        | explorer           | Razonamiento del onboarding brownfield                        |
-| `feature_list.json`                      | leader             | `pending` → `spec_ready` → `in_progress` → `done`             |
-| `progress/history.md`                    | leader             | Resumen append-only al cerrar la sesión                       |
-
-Abre `specs/` y `progress/` en tu editor mientras Claude trabaja: cada informe
-aparece en cuanto el subagente termina. Esa es la regla anti-teléfono-
-descompuesto en acción — el contenido no circula por chat, vive en disco y
-queda versionado.
-
-## Estructura
-
-```
-.
-├── AGENTS.md              # Mapa para agentes (divulgación progresiva)
-├── CLAUDE.md              # Carga automática: fuerza el rol leader + onboarding
-├── CHECKPOINTS.md         # Criterios de "estado final correcto"
-├── feature_list.json      # Alcance: una feature a la vez (vacío en la plantilla)
-├── harness.json           # Config del stack (lo genera el agente en onboarding)
-├── harness.example.json   # Referencia de stacks para el agente (no editar a mano)
-├── init.sh                # Verificación e inicialización (políglota vía harness.json)
-├── specs/<feature>/       # Spec por feature (Kiro-style), creado al dejar pending
-│   ├── requirements.md    # EARS notation
-│   ├── design.md          # Decisiones técnicas
-│   └── tasks.md           # Checklist de implementación
-├── progress/
-│   ├── current.md         # Sesión activa (estado vivo)
-│   └── history.md         # Bitácora append-only
-├── docs/
-│   ├── architecture.md    # Qué significa "buen trabajo"
-│   ├── conventions.md     # Estilo, nombres, errores
-│   ├── specs.md           # Proceso SDD: EARS, 3 archivos, aprobación humana
-│   └── verification.md    # Cómo demostrar que funciona
-├── .claude/
-│   ├── agents/            # leader, spec_author, implementer, reviewer, explorer
-│   ├── hooks/             # Scripts de los hooks (after_edit, before_stop)
-│   └── settings.json      # Hooks que automatizan la verificación
-├── src/                   # Tu código (lo genera el implementer)
-└── tests/                 # Tus tests (los genera el implementer)
+```bash
+curl -fsSL https://raw.githubusercontent.com/BlackSheep4/Maestro/harness-sdd-uncle-bob/install.sh | bash
 ```
 
-## Aprendizajes que ilustra esta plantilla
+El instalador coloca el CLI `maestro` y los ficheros del harness en `~/.maestro/` y añade
+`~/.maestro/bin` a tu `PATH` (editando tu `~/.zshrc` o `~/.bashrc`, sin `sudo`). Abre una
+terminal nueva (o `source` tu rc) y ya tienes el comando `maestro`.
 
-- **Divulgación progresiva** en `AGENTS.md`: el agente no recibe todas las
-  reglas de golpe, recibe un mapa para buscarlas bajo demanda.
-- **Una feature a la vez** validado por `init.sh` (rechaza más de un
-  `in_progress` en `feature_list.json`).
-- **Spec Driven Development** estilo Kiro: requirements (EARS) → design →
-  tasks → code, con una puerta de aprobación humana antes de tocar código.
-- **Estado en disco**, no en chat: `specs/`, `progress/current.md` y
-  `history.md` sobreviven a reinicios y context windows reventadas.
-- **Verificación ejecutable**: `init.sh` corre los tests reales y valida la
-  presencia de specs para toda feature SDD.
-- **Trazabilidad obligatoria**: cada `R<n>` se mapea a un test concreto; el
-  reviewer rechaza si falta.
-- **Separación de roles**: el leader orquesta pero no escribe `src/`/`tests/`;
-  el spec_author no codifica; el implementer no se autoaprueba; el reviewer no
-  edita código; el leader marca `done` solo con un veredicto APPROVED.
-- **Anti teléfono-descompuesto**: los subagentes escriben sus resultados en
-  archivos y solo devuelven una referencia ligera.
+> **Requisitos:** `bash`, `git`/`curl`, y `jq` **o** `python3` (cualquiera de los dos).
+
+**Variables de entorno del instalador:**
+
+| Variable            | Por defecto              | Para qué |
+|---------------------|--------------------------|----------|
+| `MAESTRO_HOME`      | `~/.maestro`             | Dónde instalar |
+| `MAESTRO_REF`       | `harness-sdd-uncle-bob`  | Rama/tag/sha del repo a instalar |
+| `MAESTRO_REPO`      | `BlackSheep4/Maestro`    | `owner/repo` de origen |
+| `MAESTRO_LOCAL_SRC` | —                        | Instala desde un clon local en vez de descargar |
+
+## Inicio rápido
+
+```bash
+cd mi-proyecto       # nuevo o existente
+maestro init         # instala el harness aquí (detecta greenfield/brownfield)
+claude               # abre Claude Code: el agente completa el onboarding
+```
+
+`maestro init` despliega el andamiaje pero **no** genera `harness.json` ni hace onboarding:
+eso lo hace el agente de Claude Code en la primera sesión. El CLI prepara el terreno; el
+agente lo configura.
+
+## Comandos
+
+| Comando            | Qué hace |
+|--------------------|----------|
+| `maestro`          | Sin argumentos, muestra la ayuda |
+| `maestro init`     | Instala el harness en el directorio actual (no pisa tu código; detecta greenfield/brownfield) |
+| `maestro status`   | Tabla de features con color por estado (`done`/`in_progress`/`pending`/`blocked`/`spec_ready`) |
+| `maestro check`    | Ejecuta `./init.sh` y propaga su exit code (apto para CI) |
+| `maestro upgrade`  | Actualiza el harness preservando tu contenido (regiones `HARNESS:FILL`); nunca toca `feature_list.json`, `harness.json` ni `progress/` |
+| `maestro version`  | Muestra la versión instalada |
+| `maestro help`     | Muestra la ayuda |
+
+### Actualizar a una versión nueva
+
+```bash
+# 1. Refresca el CLI y los templates en ~/.maestro
+curl -fsSL https://raw.githubusercontent.com/BlackSheep4/Maestro/harness-sdd-uncle-bob/install.sh | bash
+# 2. Aplica la actualización en tu proyecto (preserva tus HARNESS:FILL)
+cd mi-proyecto && maestro upgrade
+```
+
+## Cómo funciona
+
+Tras `maestro init` y el onboarding, le pides a Claude Code: **«implementa la siguiente
+feature pendiente»**. El flujo ocurre en dos fases con una puerta de aprobación humana:
+
+```
+pending → [spec_author] → spec_ready → ⏸ HUMANO APRUEBA → in_progress → [implementer → reviewer] → done
+```
+
+1. **Spec.** El `leader` lanza al `spec_author`, que escribe
+   `specs/<feature>/{requirements,design,tasks}.md` (requirements en EARS) y **para** a
+   esperar tu aprobación.
+2. **Código.** Tras tu «aprobado», el `implementer` ejecuta las tasks una a una y el
+   `reviewer` verifica la trazabilidad `R<n> ↔ test`. Si aprueba, el `leader` marca la
+   feature `done`.
+
+Todo el rastro vive en disco (`specs/`, `progress/`), no en el chat — sobrevive a
+reinicios y context windows reventadas.
+
+👉 **La explicación detallada de cada pieza está en la [Wiki](https://github.com/BlackSheep4/Maestro/wiki):**
+arquitectura, los cinco agentes, el flujo SDD, los ficheros y artefactos, y la referencia
+completa del CLI.
+
+## Licencia
+
+MIT
