@@ -13,8 +13,9 @@ forma autónoma, verificable y reproducible desde la primera sesión.
 
 El arnés es **políglota**: el stack (lenguaje, versión mínima, comando de
 tests, rutas) vive en `harness.json` y `init.sh` lo lee de ahí. Sirve igual
-para Python, Node, Go o Rust. (Requisito del propio arnés: `python3` disponible
-para parsear la configuración JSON.)
+para Python, Node, Go o Rust. Para parsear su propia configuración JSON,
+`init.sh` usa **`jq` o `python3`** (cualquiera de los dos; detecta el que esté
+disponible), así que no impone un runtime concreto a tu proyecto.
 
 ## Cómo está organizado el arnés
 

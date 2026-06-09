@@ -18,6 +18,56 @@ fail()  { printf "${RED}[FAIL]${NC}  %s\n" "$1"; }
 
 EXIT_CODE=0
 
+# ── Parser JSON ────────────────────────────────────────────
+# El arnés es políglota y NO asume un runtime concreto: lee su configuración
+# JSON con `jq` (preferido) o, si no está, con `python3`. Funciona con
+# CUALQUIERA de los dos, así no obliga a tener Python en stacks Node/Go/Rust
+# ni jq en cajas solo-Python. (awk, usado para comparar versiones, es ubicuo.)
+if command -v jq >/dev/null 2>&1; then
+  JSON_TOOL="jq"
+elif command -v python3 >/dev/null 2>&1; then
+  JSON_TOOL="python3"
+else
+  fail "Necesito 'jq' o 'python3' para leer la configuración JSON del arnés. Instala uno de los dos."
+  exit 1
+fi
+
+# jget <file> <jq_filter> <python_expr>
+# Extrae un escalar de un JSON. El filtro jq y la expresión python conviven en
+# el call-site para no mantener un traductor de rutas. Clave ausente → "".
+jget() {
+  if [ "$JSON_TOOL" = "jq" ]; then
+    jq -r "$2" "$1"
+  else
+    python3 -c "import json
+d=json.load(open('$1'))
+v=$3
+print('' if v is None else v)"
+  fi
+}
+
+# version_ge <actual> <min> → exit 0 si actual >= min (compara semver con awk).
+version_ge() {
+  [ -n "$1" ] || return 1
+  awk -v a="$1" -v b="$2" 'BEGIN{
+    na=split(a,x,"."); nb=split(b,y,".");
+    for(i=1;i<=3;i++){ xi=(i<=na?x[i]+0:0); yi=(i<=nb?y[i]+0:0);
+      if(xi>yi){exit 0} if(xi<yi){exit 1} }
+    exit 0 }'
+}
+
+# extract_version <parse_mode> <raw_output> → imprime la versión limpia o "".
+extract_version() {
+  local mode="$1" out="$2" raw=""
+  case "$mode" in
+    semver_first_word)  raw=$(printf '%s' "$out" | awk 'NR==1{print $1}') ;;
+    semver_second_word) raw=$(printf '%s' "$out" | awk 'NR==1{print $2}') ;;
+    semver_regex)       printf '%s' "$out" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1; return ;;
+    *) raw="" ;;
+  esac
+  printf '%s' "$raw" | sed -E 's/^[^0-9]*//'
+}
+
 echo "── 1. Verificando entorno ─────────────────────────────"
 
 # harness.json es obligatorio
@@ -27,57 +77,23 @@ if [ ! -f "harness.json" ]; then
 fi
 ok "Existe harness.json"
 
-# Leer configuración del stack con python3
-# (python3 es la única dependencia de runtime que el harness puede asumir:
-#  el bloque 3 también lo requiere para validar feature_list.json)
-STACK_LANGUAGE=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['language'])")
-HAS_VERSION_CHECK=$(python3 -c "import json; d=json.load(open('harness.json')); print('yes' if 'version_check' in d['stack'] else 'no')")
+STACK_LANGUAGE=$(jget harness.json '.stack.language' "d['stack']['language']")
+HAS_VERSION_CHECK=$(jget harness.json \
+  'if .stack | has("version_check") then "yes" else "no" end' \
+  "'yes' if 'version_check' in d['stack'] else 'no'")
 
 if [ "$HAS_VERSION_CHECK" = "yes" ]; then
-  VERSION_CMD=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['version_check']['command'])")
-  MIN_VERSION=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['version_check']['min_version'])")
-  PARSE_MODE=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['version_check']['parse'])")
+  VERSION_CMD=$(jget harness.json '.stack.version_check.command' "d['stack']['version_check']['command']")
+  MIN_VERSION=$(jget harness.json '.stack.version_check.min_version' "d['stack']['version_check']['min_version']")
+  PARSE_MODE=$(jget harness.json '.stack.version_check.parse' "d['stack']['version_check']['parse']")
 
-  # Obtener versión actual
   VERSION_OUTPUT=$(bash -c "$VERSION_CMD" 2>&1)
-  VERSION_OK=$(python3 - <<PY
-import sys, re
-output = """$VERSION_OUTPUT"""
-parse = "$PARSE_MODE"
-min_ver = "$MIN_VERSION"
+  FOUND_VERSION=$(extract_version "$PARSE_MODE" "$VERSION_OUTPUT")
 
-def strip_prefix(s):
-    return re.sub(r'^[^0-9]*', '', s)
-
-if parse == "semver_second_word":
-    parts = output.strip().split()
-    raw = parts[1] if len(parts) > 1 else ""
-elif parse == "semver_first_word":
-    raw = output.strip().split()[0] if output.strip() else ""
-elif parse == "semver_regex":
-    # Extrae el primer token con forma de versión de toda la salida.
-    # Robusto frente a salidas como "go version go1.21.5 linux/amd64",
-    # donde el número no cae en una posición de palabra fija.
-    m = re.search(r"\d+\.\d+(?:\.\d+)?", output)
-    raw = m.group(0) if m else ""
-else:
-    raw = ""
-
-version = strip_prefix(raw)
-try:
-    actual = tuple(int(x) for x in version.split(".")[:3])
-    minimum = tuple(int(x) for x in min_ver.split(".")[:3])
-    print("ok" if actual >= minimum else f"fail:{version}")
-except:
-    print("fail:unparseable")
-PY
-)
-
-  if [ "$VERSION_OK" = "ok" ]; then
+  if version_ge "$FOUND_VERSION" "$MIN_VERSION"; then
     ok "$STACK_LANGUAGE -> $VERSION_OUTPUT (>= $MIN_VERSION requerido)"
   else
-    FOUND_VERSION=$(echo "$VERSION_OK" | cut -d: -f2)
-    fail "$STACK_LANGUAGE versión $FOUND_VERSION encontrada, se requiere >= $MIN_VERSION"
+    fail "$STACK_LANGUAGE versión ${FOUND_VERSION:-no detectada} encontrada, se requiere >= $MIN_VERSION"
     exit 1
   fi
 else
@@ -99,60 +115,85 @@ done
 echo ""
 echo "── 3. Validando feature_list.json y specs ─────────────"
 
-python3 - <<'PY'
-import json, os, sys
-try:
-    data = json.load(open("feature_list.json"))
-    # Fuente única de verdad: las reglas las declara el propio feature_list.json
-    # en su bloque `rules`. init.sh las RESPETA en lugar de hardcodearlas, para
-    # que no haya dos fuentes que puedan divergir. Fallback a los valores
-    # canónicos si no existe el bloque `rules`.
-    rules = data.get("rules", {})
-    valid = set(rules.get("valid_status")
-                or {"pending", "spec_ready", "in_progress", "done", "blocked"})
-    one_at_a_time = rules.get("one_feature_at_a_time", True)
-    in_progress = [f for f in data["features"] if f["status"] == "in_progress"]
-    if one_at_a_time and len(in_progress) > 1:
-        print(f"[FAIL]  Hay {len(in_progress)} features en in_progress "
-              f"(rules.one_feature_at_a_time exige máximo 1)")
-        sys.exit(1)
-    # require_tests_to_close se honra ejecutando siempre los tests en el bloque 4
-    # (y el reviewer/leader bloquean `done` con init.sh en rojo).
-    require_spec = rules.get("require_approved_spec_to_implement", True)
-    requires_spec = {"spec_ready", "in_progress", "done"}
-    spec_errors = []
-    for f in data["features"]:
-        if f["status"] not in valid:
-            print(f"[FAIL]  Estado inválido en feature {f['id']}: {f['status']}")
-            sys.exit(1)
-        if require_spec and f.get("sdd") and f["status"] in requires_spec:
-            spec_dir = os.path.join("specs", f["name"])
-            for fname in ("requirements.md", "design.md", "tasks.md"):
-                if not os.path.isfile(os.path.join(spec_dir, fname)):
-                    spec_errors.append(
-                        f"feature {f['id']} ({f['name']}) en {f['status']} "
-                        f"sin {spec_dir}/{fname}"
-                    )
-    if spec_errors:
-        for e in spec_errors:
-            print(f"[FAIL]  {e}")
-        sys.exit(1)
-    print(f"[OK]    feature_list.json válido ({len(data['features'])} features)")
-    print(f"[OK]    Specs presentes para features sdd con estado no-pending")
-except SystemExit:
-    raise
-except Exception as e:
-    print(f"[FAIL]  feature_list.json o specs inválidos: {e}")
-    sys.exit(1)
-PY
+# Fuente única de verdad: las reglas las declara el propio feature_list.json en
+# su bloque `rules`. init.sh las RESPETA en lugar de hardcodearlas. Fallback a
+# los valores canónicos si falta el bloque (o si el JSON es inválido).
+VALID_CSV=$(jget feature_list.json \
+  '(.rules.valid_status // ["pending","spec_ready","in_progress","done","blocked"]) | join(",")' \
+  "','.join(d.get('rules',{}).get('valid_status') or ['pending','spec_ready','in_progress','done','blocked'])" \
+  2>/dev/null)
+VALID_CSV=${VALID_CSV:-pending,spec_ready,in_progress,done,blocked}
+# Nota jq: `//` trata `false` como vacío (igual que null), así que
+# `(.x // true)` devolvería true cuando .x es false. Para flags booleanos hay
+# que comprobar null explícitamente.
+ONE_AT_A_TIME=$(jget feature_list.json '(.rules.one_feature_at_a_time | if . == null then true else . end | tostring)' \
+  "str(d.get('rules',{}).get('one_feature_at_a_time', True)).lower()" 2>/dev/null)
+ONE_AT_A_TIME=${ONE_AT_A_TIME:-true}
+REQUIRE_SPEC=$(jget feature_list.json '(.rules.require_approved_spec_to_implement | if . == null then true else . end | tostring)' \
+  "str(d.get('rules',{}).get('require_approved_spec_to_implement', True)).lower()" 2>/dev/null)
+REQUIRE_SPEC=${REQUIRE_SPEC:-true}
+REQUIRE_TESTS=$(jget feature_list.json '(.rules.require_tests_to_close | if . == null then true else . end | tostring)' \
+  "str(d.get('rules',{}).get('require_tests_to_close', True)).lower()" 2>/dev/null)
+REQUIRE_TESTS=${REQUIRE_TESTS:-true}
 
-if [ $? -ne 0 ]; then EXIT_CODE=1; fi
+feat_lines() {
+  if [ "$JSON_TOOL" = "jq" ]; then
+    jq -r '.features[] | [(.id|tostring), .status, .name, ((.sdd // false)|tostring)] | @tsv' feature_list.json
+  else
+    python3 -c "import json
+for f in json.load(open('feature_list.json'))['features']:
+    print('\t'.join([str(f['id']), f['status'], f['name'], str(bool(f.get('sdd'))).lower()]))"
+  fi
+}
+
+FEAT_COUNT=$(jget feature_list.json '.features | length' "len(d['features'])" 2>/dev/null)
+if ! printf '%s' "$FEAT_COUNT" | grep -qE '^[0-9]+$'; then
+  fail "feature_list.json inválido (no es JSON válido o no tiene 'features')"
+  EXIT_CODE=1
+else
+  invalid_found=0
+  in_progress_count=0
+  spec_missing=0
+  while IFS=$(printf '\t') read -r id status name sdd; do
+    [ -n "${status:-}" ] || continue
+    case ",$VALID_CSV," in
+      *",$status,"*) ;;
+      *) fail "Estado inválido en feature $id: $status"; invalid_found=1 ;;
+    esac
+    [ "$status" = "in_progress" ] && in_progress_count=$((in_progress_count + 1))
+    if [ "$REQUIRE_SPEC" = "true" ] && [ "$sdd" = "true" ]; then
+      case "$status" in
+        spec_ready|in_progress|done)
+          for fname in requirements.md design.md tasks.md; do
+            if [ ! -f "specs/$name/$fname" ]; then
+              fail "feature $id ($name) en $status sin specs/$name/$fname"
+              spec_missing=1
+            fi
+          done ;;
+      esac
+    fi
+  done <<EOF
+$(feat_lines)
+EOF
+
+  if [ "$invalid_found" -ne 0 ]; then
+    EXIT_CODE=1
+  elif [ "$ONE_AT_A_TIME" = "true" ] && [ "$in_progress_count" -gt 1 ]; then
+    fail "Hay $in_progress_count features en in_progress (rules.one_feature_at_a_time exige máximo 1)"
+    EXIT_CODE=1
+  elif [ "$spec_missing" -ne 0 ]; then
+    EXIT_CODE=1
+  else
+    ok "feature_list.json válido ($FEAT_COUNT features)"
+    ok "Specs presentes para features sdd con estado no-pending"
+  fi
+fi
 
 echo ""
 echo "── 4. Ejecutando tests ─────────────────────────────────"
 
-TEST_DIR=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['test_dir'])")
-TEST_CMD=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['test_cmd'])")
+TEST_DIR=$(jget harness.json '.stack.test_dir' "d['stack']['test_dir']")
+TEST_CMD=$(jget harness.json '.stack.test_cmd' "d['stack']['test_cmd']")
 
 if [ ! -d "$TEST_DIR" ]; then
   warn "Carpeta $TEST_DIR/ no existe todavía"
@@ -164,9 +205,11 @@ elif [ -z "$(find "$TEST_DIR" -type f ! -name '.*' ! -name '__init__.py' ! -name
   warn "Carpeta $TEST_DIR/ existe pero no contiene tests todavía"
 elif bash -c "$TEST_CMD" 2>&1; then
   ok "Todos los tests pasan"
-else
+elif [ "$REQUIRE_TESTS" = "true" ]; then
   fail "Hay tests rotos"
   EXIT_CODE=1
+else
+  warn "Hay tests rotos, pero rules.require_tests_to_close=false: no bloquea el cierre"
 fi
 
 echo ""
