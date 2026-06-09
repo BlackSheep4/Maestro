@@ -27,6 +27,21 @@
    rellena los gaps directamente con sus respuestas. Un harness con secciones
    `FILL` vacías produce specs y código incorrectos.
 
+   **Reparto de quién rellena cada `HARNESS:FILL`** (aplica en greenfield y
+   brownfield; ningún fichero queda sin dueño):
+
+   | Fichero (`FILL`)          | Quién         | Fuente                                    |
+   |---------------------------|---------------|-------------------------------------------|
+   | `CHECKPOINTS.md`          | leader        | mecánico, desde `harness.json`            |
+   | `docs/verification.md` (comando de tests) | leader | mecánico, desde `harness.json`     |
+   | `docs/specs.md` (ejemplos)| leader        | mecánico, ajustado al `test_cmd` del stack |
+   | `docs/architecture.md`    | explorer (brownfield) / leader+humano (greenfield) | código existente o respuestas del humano |
+   | `docs/conventions.md`     | explorer (brownfield) / leader+humano (greenfield) | código existente o respuestas del humano |
+   | `docs/verification.md` (ejemplos de integración) | leader+humano | dominio del proyecto |
+
+   En brownfield el `explorer` cubre `architecture.md` y `conventions.md`; el
+   resto los completa el leader (mecánicos) o preguntando al humano (de dominio).
+
 ## 2. Mapa del repositorio
 
 | Archivo / carpeta            | Qué contiene                                                                | Cuándo leerlo |
@@ -76,9 +91,10 @@ pending → [spec_author] → spec_ready → ⏸ HUMANO → in_progress → [imp
 4. Una vez aprobado, el leader cambia el status a `in_progress` y lanza `implementer`.
 5. El implementer ejecuta `tasks.md` una a una, marcándolas `[x]`.
 6. El reviewer verifica trazabilidad `R<n>` ↔ test y tasks completas;
-   aprueba o rechaza.
-7. Si aprueba, el implementer marca `done` y mueve el resumen a
-   `progress/history.md`.
+   aprueba o rechaza. Escribe su veredicto en `progress/review_<name>.md`.
+7. Si el veredicto es `APPROVED`, **el leader** marca `done` y mueve el resumen
+   a `progress/history.md`. Si es `CHANGES_REQUESTED`, el leader relanza al
+   implementer con los cambios pedidos.
 
 ## 5. Cierre de sesión (lifecycle)
 

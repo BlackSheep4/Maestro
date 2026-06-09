@@ -54,6 +54,12 @@ if parse == "semver_second_word":
     raw = parts[1] if len(parts) > 1 else ""
 elif parse == "semver_first_word":
     raw = output.strip().split()[0] if output.strip() else ""
+elif parse == "semver_regex":
+    # Extrae el primer token con forma de versión de toda la salida.
+    # Robusto frente a salidas como "go version go1.21.5 linux/amd64",
+    # donde el número no cae en una posición de palabra fija.
+    m = re.search(r"\d+\.\d+(?:\.\d+)?", output)
+    raw = m.group(0) if m else ""
 else:
     raw = ""
 
@@ -81,7 +87,7 @@ fi
 echo ""
 echo "── 2. Verificando archivos base del arnés ──────────────"
 
-for f in AGENTS.md feature_list.json harness.json progress/current.md docs/architecture.md docs/conventions.md docs/verification.md CHECKPOINTS.md; do
+for f in AGENTS.md feature_list.json harness.json progress/current.md docs/architecture.md docs/conventions.md docs/specs.md docs/verification.md CHECKPOINTS.md; do
   if [ ! -f "$f" ]; then
     fail "Falta archivo base: $f"
     EXIT_CODE=1
@@ -137,15 +143,18 @@ echo "── 4. Ejecutando tests ───────────────�
 TEST_DIR=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['test_dir'])")
 TEST_CMD=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['test_cmd'])")
 
-if [ -d "$TEST_DIR" ]; then
-  if bash -c "$TEST_CMD" 2>&1; then
-    ok "Todos los tests pasan"
-  else
-    fail "Hay tests rotos"
-    EXIT_CODE=1
-  fi
-else
+if [ ! -d "$TEST_DIR" ]; then
   warn "Carpeta $TEST_DIR/ no existe todavía"
+elif [ -z "$(find "$TEST_DIR" -type f ! -name '.*' 2>/dev/null | head -1)" ]; then
+  # Greenfield recién inicializado: el directorio de tests existe pero está
+  # vacío. No es un fallo — todavía no hay nada que ejecutar. (pytest, por
+  # ejemplo, saldría con código 5 "no tests collected" y lo marcaría en rojo.)
+  warn "Carpeta $TEST_DIR/ existe pero no contiene tests todavía"
+elif bash -c "$TEST_CMD" 2>&1; then
+  ok "Todos los tests pasan"
+else
+  fail "Hay tests rotos"
+  EXIT_CODE=1
 fi
 
 echo ""

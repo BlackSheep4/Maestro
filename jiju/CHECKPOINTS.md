@@ -10,8 +10,8 @@
 
 - [ ] Existen los archivos base: `AGENTS.md`, `init.sh`, `feature_list.json`,
       `harness.json`, `progress/current.md`.
-- [ ] Existen los 3 docs: `docs/architecture.md`, `docs/conventions.md`,
-      `docs/verification.md`.
+- [ ] Existen los 4 docs: `docs/architecture.md`, `docs/conventions.md`,
+      `docs/specs.md`, `docs/verification.md`.
 - [ ] `./init.sh` termina con exit code 0.
 - [ ] Si el proyecto es brownfield: existe `progress/explorer_brownfield.md`
       y `feature_list.json` tiene al menos una feature `done`.

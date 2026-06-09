@@ -46,7 +46,7 @@
         "version_check": {
           "command": "go version",
           "min_version": "1.21.0",
-          "parse": "semver_second_word"
+          "parse": "semver_regex"
         },
         "test_cmd": "go test ./...",
         "src_dir": ".",

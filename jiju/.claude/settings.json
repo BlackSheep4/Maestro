@@ -1,5 +1,5 @@
 {
-  "$schema_comment": "Hooks que automatizan la verificación. El harness los ejecuta, no el agente, así que no se pueden saltar.",
+  "$schema_comment": "Hooks que automatizan la verificación. El harness los ejecuta, no el agente, así que no se pueden saltar. La lógica vive en .claude/hooks/ para que sea legible y testeable.",
   "hooks": {
     "PostToolUse": [
       {
@@ -7,8 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c \"$(python3 -c 'import json; print(json.load(open(\"harness.json\"))[\"stack\"][\"test_cmd\"])') 2>&1 | tail -3\"",
-            "description": "Tras editar o escribir archivos, corre los tests y muestra el resumen."
+            "command": ".claude/hooks/after_edit.sh",
+            "description": "Tras editar código en src/ o tests/, corre los tests y muestra el resumen. Silencioso para el resto de archivos y durante el onboarding."
           }
         ]
       }
@@ -18,8 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./init.sh > /tmp/harness_init.log 2>&1 && echo '[harness] init.sh OK' || (echo '[harness] init.sh FALLÓ — revisa /tmp/harness_init.log antes de cerrar' && cat /tmp/harness_init.log | tail -20)",
-            "description": "Antes de cerrar la sesión, fuerza una verificación completa."
+            "command": ".claude/hooks/before_stop.sh",
+            "description": "Antes de cerrar la sesión, fuerza una verificación completa (init.sh). Omitida durante el onboarding."
           }
         ]
       }
@@ -27,9 +27,7 @@
   },
   "permissions": {
     "allow": [
-      "Bash(./init.sh)",
-      "Bash(python3 -m unittest*)",
-      "Bash(python3 -m src.cli*)"
+      "Bash(./init.sh)"
     ]
   }
 }

@@ -12,7 +12,10 @@ implementar.
 
 - ❌ **No edites** archivos en `src/` ni `tests/` directamente (ni con Edit, ni
   con Write, ni con Bash).
-- ❌ **No marques** features como `done` en `feature_list.json`.
+- ⚠️ **No marques** features como `done` por tu cuenta. Solo transicionas a
+  `done` cuando el `reviewer` ha dejado un veredicto `APPROVED` en
+  `progress/review_<name>.md` (ver `.claude/agents/leader.md`, Caso B). Marcar
+  `done` sin ese veredicto está prohibido.
 - ❌ **No saltes la fase de spec.** Toda feature con `"sdd": true` debe
   pasar por `spec_author` antes de cualquier implementación.
 - ❌ **No saltes la puerta de aprobación humana** entre `spec_ready` e
@@ -81,21 +84,37 @@ modo GREENFIELD para generarlo, y luego evalúa `src_dir`.)
 
 3. Escribe `harness.json` en la raíz del proyecto.
 
-4. **Paso adicional tras generar `harness.json`:** lee `CHECKPOINTS.md` y
-   rellena automáticamente todas las secciones `HARNESS:FILL` usando los
-   valores de `harness.json` (`src_dir`, `test_dir`, `test_cmd`). No necesitas
-   preguntar al humano — la información ya está disponible. Una vez rellenados,
-   los checkpoints son los criterios de evaluación reales del proyecto.
+4. **Rellena los `HARNESS:FILL` mecánicos tras generar `harness.json`:** hay
+   secciones `FILL` que se derivan directamente de `harness.json` y no
+   requieren preguntar al humano. Rellénalas usando `src_dir`, `test_dir` y
+   `test_cmd`:
+   - `CHECKPOINTS.md` (items de C3 y C4).
+   - `docs/verification.md` (comando de tests del Nivel 1).
+   - `docs/specs.md` (ajusta los ejemplos de `requirements.md`/`tasks.md` al
+     comando real del stack).
+   Los `FILL` que dependen del dominio (`docs/architecture.md`,
+   `docs/conventions.md`, ejemplos de integración de `docs/verification.md`) se
+   rellenan preguntando al humano — ver la tabla de reparto en `AGENTS.md` §1.
 
 5. Confirma al humano con una línea: "harness.json generado para
    <language>. Ejecutando init.sh..."
 
 6. Ejecuta `./init.sh` y continúa con el protocolo de arranque normal.
 
+7. **Intake de la primera feature (greenfield).** Tras generar `harness.json`,
+   `feature_list.json` sigue vacío: en greenfield no hay código del que inferir
+   features. Pregunta al humano qué quiere construir primero e inscríbela como
+   `pending` en `feature_list.json` (con `"sdd": true` si quiere el flujo SDD
+   completo). Sin esta feature inicial no hay nada que el `spec_author` pueda
+   tomar. No vuelvas a ejecutar el bloque de preguntas de stack si
+   `harness.json` ya existe — el onboarding de stack se hace **una sola vez**.
+
 **PASO 3 — Modo BROWNFIELD:**
 
 1. Si `harness.json` no existe, ejecuta primero las preguntas de stack del
-   modo GREENFIELD (PASO 2.1–2.3) para generarlo.
+   modo GREENFIELD (PASO 2.1–2.3) para generarlo, y rellena los `HARNESS:FILL`
+   mecánicos (PASO 2.4: `CHECKPOINTS.md`, `docs/verification.md`, `docs/specs.md`).
+   El `explorer` **no** toca `CHECKPOINTS.md`, así que ese fill es tuyo.
 2. Lanza el subagente `explorer` con la instrucción:
    "Analiza el proyecto existente en `<src_dir>` y ejecuta el protocolo
    brownfield completo."
