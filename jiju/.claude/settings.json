@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m unittest discover -s tests -q 2>&1 | tail -3",
+            "command": "bash -c \"$(python3 -c 'import json; print(json.load(open(\"harness.json\"))[\"stack\"][\"test_cmd\"])') 2>&1 | tail -3\"",
             "description": "Tras editar o escribir archivos, corre los tests y muestra el resumen."
           }
         ]

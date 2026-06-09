@@ -8,21 +8,33 @@
 
 ## 1. Antes de empezar (obligatorio)
 
-1. Ejecuta `./init.sh` y verifica que termina sin errores. Si falla, **para**
-   y resuelve el entorno antes de tocar código.
+1. Si `harness.json` no existe, ejecuta el protocolo de onboarding de
+   `CLAUDE.md` antes de cualquier otra cosa. Si existe, ejecuta `./init.sh`
+   directamente y verifica que termina sin errores. Si falla, **para** y
+   resuelve el entorno antes de tocar código.
 2. Lee `progress/current.md` para entender en qué estado quedó la última sesión.
 3. Lee `feature_list.json`. Toda feature nueva (`"sdd": true`) pasa por
    **Spec Driven Development** — ver `docs/specs.md` y §4 de este archivo.
 4. Lee `docs/specs.md` antes de tocar cualquier spec o feature `sdd: true`.
+5. **Verifica que las secciones `HARNESS:FILL` de `docs/` están rellenas.** Los
+   docs combinan secciones `HARNESS:REQUIRED` (reglas del harness, no se tocan)
+   con secciones `HARNESS:FILL` (contexto del proyecto, las rellena el humano).
+   Si alguna `HARNESS:FILL` aún contiene el placeholder original sin completar,
+   formula al humano las preguntas necesarias para obtener esa información y
+   rellena los gaps directamente con sus respuestas. Un harness con secciones
+   `FILL` vacías produce specs y código incorrectos.
 
 ## 2. Mapa del repositorio
 
 | Archivo / carpeta            | Qué contiene                                                                | Cuándo leerlo |
 |------------------------------|-----------------------------------------------------------------------------|---------------|
 | `feature_list.json`          | Lista de tareas con estado (`pending` / `spec_ready` / `in_progress` / `done` / `blocked`) | Siempre, al empezar |
+| `harness.json`               | Configuración del stack del proyecto (lenguaje, versión mínima, comando de tests). Generado por el agente en la primera sesión mediante asunción dinámica. | Siempre, al empezar |
+| `harness.example.json`       | Referencia de configuraciones para stacks comunes. El agente lo consulta al generar `harness.json`. No editar manualmente. | Solo el agente, durante onboarding |
 | `progress/current.md`        | Estado de la sesión actual                                                  | Siempre, al empezar |
 | `progress/history.md`        | Bitácora append-only de sesiones anteriores                                 | Si necesitas contexto histórico |
 | `specs/<feature>/`           | `requirements.md` + `design.md` + `tasks.md` (Kiro-style)                   | Antes de implementar cualquier feature con `"sdd": true` |
+| `progress/spec_interview_<feature>.md` | Preguntas de clarificación del `spec_author` y respuestas del humano | Si necesitas entender las decisiones que dieron forma a un spec |
 | `docs/architecture.md`       | Qué significa "hacer un buen trabajo" en este proyecto                      | Antes de implementar |
 | `docs/conventions.md`        | Reglas de estilo, nombres, estructura                                       | Antes de escribir código |
 | `docs/specs.md`              | Proceso SDD: EARS notation, los 3 archivos, puerta de aprobación humana     | Antes de redactar o leer un spec |

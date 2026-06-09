@@ -20,25 +20,68 @@ EXIT_CODE=0
 
 echo "── 1. Verificando entorno ─────────────────────────────"
 
-# Python disponible
-if ! command -v python3 >/dev/null 2>&1; then
-  fail "python3 no está instalado"
+# harness.json es obligatorio
+if [ ! -f "harness.json" ]; then
+  fail "Falta harness.json — el agente debe generarlo (protocolo de onboarding de CLAUDE.md) antes de ejecutar init.sh"
   exit 1
 fi
-ok "python3 -> $(python3 --version)"
+ok "Existe harness.json"
 
-# Versión mínima 3.9 (dataclasses + typing moderno)
-PY_VERSION_OK=$(python3 -c 'import sys; print(int(sys.version_info >= (3, 9)))')
-if [ "$PY_VERSION_OK" != "1" ]; then
-  fail "Se requiere Python >= 3.9"
-  exit 1
+# Leer configuración del stack con python3
+# (python3 es la única dependencia de runtime que el harness puede asumir:
+#  el bloque 3 también lo requiere para validar feature_list.json)
+STACK_LANGUAGE=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['language'])")
+HAS_VERSION_CHECK=$(python3 -c "import json; d=json.load(open('harness.json')); print('yes' if 'version_check' in d['stack'] else 'no')")
+
+if [ "$HAS_VERSION_CHECK" = "yes" ]; then
+  VERSION_CMD=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['version_check']['command'])")
+  MIN_VERSION=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['version_check']['min_version'])")
+  PARSE_MODE=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['version_check']['parse'])")
+
+  # Obtener versión actual
+  VERSION_OUTPUT=$(bash -c "$VERSION_CMD" 2>&1)
+  VERSION_OK=$(python3 - <<PY
+import sys, re
+output = """$VERSION_OUTPUT"""
+parse = "$PARSE_MODE"
+min_ver = "$MIN_VERSION"
+
+def strip_prefix(s):
+    return re.sub(r'^[^0-9]*', '', s)
+
+if parse == "semver_second_word":
+    parts = output.strip().split()
+    raw = parts[1] if len(parts) > 1 else ""
+elif parse == "semver_first_word":
+    raw = output.strip().split()[0] if output.strip() else ""
+else:
+    raw = ""
+
+version = strip_prefix(raw)
+try:
+    actual = tuple(int(x) for x in version.split(".")[:3])
+    minimum = tuple(int(x) for x in min_ver.split(".")[:3])
+    print("ok" if actual >= minimum else f"fail:{version}")
+except:
+    print("fail:unparseable")
+PY
+)
+
+  if [ "$VERSION_OK" = "ok" ]; then
+    ok "$STACK_LANGUAGE -> $VERSION_OUTPUT (>= $MIN_VERSION requerido)"
+  else
+    FOUND_VERSION=$(echo "$VERSION_OK" | cut -d: -f2)
+    fail "$STACK_LANGUAGE versión $FOUND_VERSION encontrada, se requiere >= $MIN_VERSION"
+    exit 1
+  fi
+else
+  ok "Stack: $STACK_LANGUAGE (sin verificación de versión configurada)"
 fi
-ok "Versión de Python compatible"
 
 echo ""
 echo "── 2. Verificando archivos base del arnés ──────────────"
 
-for f in AGENTS.md feature_list.json progress/current.md docs/architecture.md docs/conventions.md docs/verification.md CHECKPOINTS.md; do
+for f in AGENTS.md feature_list.json harness.json progress/current.md docs/architecture.md docs/conventions.md docs/verification.md CHECKPOINTS.md; do
   if [ ! -f "$f" ]; then
     fail "Falta archivo base: $f"
     EXIT_CODE=1
@@ -91,15 +134,18 @@ if [ $? -ne 0 ]; then EXIT_CODE=1; fi
 echo ""
 echo "── 4. Ejecutando tests ─────────────────────────────────"
 
-if [ -d "tests" ]; then
-  if python3 -m unittest discover -s tests -v 2>&1; then
+TEST_DIR=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['test_dir'])")
+TEST_CMD=$(python3 -c "import json; d=json.load(open('harness.json')); print(d['stack']['test_cmd'])")
+
+if [ -d "$TEST_DIR" ]; then
+  if bash -c "$TEST_CMD" 2>&1; then
     ok "Todos los tests pasan"
   else
     fail "Hay tests rotos"
     EXIT_CODE=1
   fi
 else
-  warn "Carpeta tests/ no existe todavía"
+  warn "Carpeta $TEST_DIR/ no existe todavía"
 fi
 
 echo ""

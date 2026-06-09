@@ -22,6 +22,12 @@ aplicados a un CLI minimalista de notas en Python.
 ./init.sh
 ```
 
+`./init.sh` requiere que `harness.json` exista. Ese fichero define el stack del
+proyecto (lenguaje, versión mínima, comando de tests) y **lo genera el agente
+en la primera sesión** mediante el protocolo de onboarding (te hace 3 preguntas
+y escribe el JSON por ti). Si ejecutas `./init.sh` antes de que exista, el
+script falla con un mensaje que te dirige al onboarding.
+
 Si todo está verde, abre `AGENTS.md` y sigue desde ahí.
 
 ## Para usar la app (humanos)
@@ -89,7 +95,9 @@ vive en disco y queda versionado.
 ├── AGENTS.md              # Mapa para agentes (divulgación progresiva)
 ├── CHECKPOINTS.md         # Criterios de "estado final correcto"
 ├── feature_list.json      # Alcance: una feature a la vez
-├── init.sh                # Verificación e inicialización
+├── harness.json           # Config del stack (lo genera el agente en onboarding)
+├── harness.example.json   # Referencia de stacks para el agente (no editar a mano)
+├── init.sh                # Verificación e inicialización (políglota vía harness.json)
 ├── specs/<feature>/       # Spec por feature (Kiro-style)
 │   ├── requirements.md    # EARS notation
 │   ├── design.md          # Decisiones técnicas

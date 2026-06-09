@@ -35,7 +35,10 @@ Mira el status de la primera feature no-`done` / no-`blocked` en
 
 ### Caso A — status == `pending`
 
-1. Lanza **1 subagente `spec_author`**.
+1. Lanza **1 subagente `spec_author`**. El `spec_author` puede necesitar
+   formular preguntas de clarificación al humano antes de redactar (máximo 3,
+   en un único bloque). Si lo hace, espera las respuestas antes de continuar.
+   Este diálogo es parte del proceso, no una interrupción.
 2. El `spec_author` redacta
    `specs/<name>/{requirements.md, design.md, tasks.md}` y cambia el status
    a `spec_ready`.

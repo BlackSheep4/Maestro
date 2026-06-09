@@ -1,0 +1,65 @@
+{
+  "_comment": "Fichero de referencia para el agente. No editar manualmente. El agente lo consulta al generar harness.json mediante asunción dinámica.",
+  "examples": {
+    "python": {
+      "stack": {
+        "language": "python",
+        "version_check": {
+          "command": "python3 --version",
+          "min_version": "3.9.0",
+          "parse": "semver_second_word"
+        },
+        "test_cmd": "python3 -m pytest",
+        "src_dir": "src",
+        "test_dir": "tests"
+      }
+    },
+    "python_unittest": {
+      "stack": {
+        "language": "python",
+        "version_check": {
+          "command": "python3 --version",
+          "min_version": "3.9.0",
+          "parse": "semver_second_word"
+        },
+        "test_cmd": "python3 -m unittest discover -s tests -v",
+        "src_dir": "src",
+        "test_dir": "tests"
+      }
+    },
+    "node": {
+      "stack": {
+        "language": "node",
+        "version_check": {
+          "command": "node --version",
+          "min_version": "18.0.0",
+          "parse": "semver_first_word"
+        },
+        "test_cmd": "npm test",
+        "src_dir": "src",
+        "test_dir": "tests"
+      }
+    },
+    "go": {
+      "stack": {
+        "language": "go",
+        "version_check": {
+          "command": "go version",
+          "min_version": "1.21.0",
+          "parse": "semver_second_word"
+        },
+        "test_cmd": "go test ./...",
+        "src_dir": ".",
+        "test_dir": "."
+      }
+    },
+    "rust": {
+      "stack": {
+        "language": "rust",
+        "test_cmd": "cargo test",
+        "src_dir": "src",
+        "test_dir": "tests"
+      }
+    }
+  }
+}
