@@ -41,7 +41,7 @@ bash puro y lee JSON con `jq` o `python3`.
 ## Instalación
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BlackSheep4/Maestro/harness-sdd-uncle-bob/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/BlackSheep4/Maestro/main/install.sh | bash
 ```
 
 El instalador coloca el CLI `maestro` y los ficheros del harness en `~/.maestro/` y añade
@@ -55,7 +55,7 @@ terminal nueva (o `source` tu rc) y ya tienes el comando `maestro`.
 | Variable            | Por defecto              | Para qué |
 |---------------------|--------------------------|----------|
 | `MAESTRO_HOME`      | `~/.maestro`             | Dónde instalar |
-| `MAESTRO_REF`       | `harness-sdd-uncle-bob`  | Rama/tag/sha del repo a instalar |
+| `MAESTRO_REF`       | `main`  | Rama/tag/sha del repo a instalar |
 | `MAESTRO_REPO`      | `BlackSheep4/Maestro`    | `owner/repo` de origen |
 | `MAESTRO_LOCAL_SRC` | —                        | Instala desde un clon local en vez de descargar |
 
@@ -87,7 +87,7 @@ agente lo configura.
 
 ```bash
 # 1. Refresca el CLI y los templates en ~/.maestro
-curl -fsSL https://raw.githubusercontent.com/BlackSheep4/Maestro/harness-sdd-uncle-bob/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/BlackSheep4/Maestro/main/install.sh | bash
 # 2. Aplica la actualización en tu proyecto (preserva tus HARNESS:FILL)
 cd mi-proyecto && maestro upgrade
 ```

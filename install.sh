@@ -14,7 +14,7 @@
 set -eu
 
 MAESTRO_REPO="${MAESTRO_REPO:-BlackSheep4/Maestro}"
-MAESTRO_REF="${MAESTRO_REF:-harness-sdd-uncle-bob}"
+MAESTRO_REF="${MAESTRO_REF:-main}"
 MAESTRO_HOME="${MAESTRO_HOME:-$HOME/.maestro}"
 # Subdirectorio del repo donde vive el harness. Vacío = raíz del repo.
 SUBDIR="${MAESTRO_SUBDIR:-}"
