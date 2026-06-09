@@ -1,0 +1,167 @@
+{
+  "project": "notes-cli",
+  "description": "CLI minimalista de notas en Python. Sirve como ejemplo didáctico de Harness Engineering.",
+  "rules": {
+    "one_feature_at_a_time": true,
+    "require_tests_to_close": true,
+    "require_approved_spec_to_implement": true,
+    "valid_status": ["pending", "spec_ready", "in_progress", "done", "blocked"],
+    "sdd_required_when": "feature has \"sdd\": true"
+  },
+  "features": [
+    {
+      "id": 1,
+      "name": "storage_layer",
+      "title": "Capa de almacenamiento JSON",
+      "description": "Lectura/escritura atómica de notas en un archivo JSON. Crea el archivo si no existe.",
+      "acceptance": [
+        "Existe src/storage.py con funciones load() y save(notes)",
+        "save() es atómico (escritura a archivo temporal + rename)",
+        "load() devuelve [] si el archivo no existe",
+        "tests/test_storage.py cubre los 3 casos anteriores"
+      ],
+      "status": "done"
+    },
+    {
+      "id": 2,
+      "name": "note_model",
+      "title": "Modelo de Nota",
+      "description": "Estructura inmutable que representa una nota con id, title, body, created_at.",
+      "acceptance": [
+        "Existe src/notes.py con la clase/dataclass Note",
+        "Note.new(title, body) genera id incremental y created_at en ISO 8601",
+        "tests/test_notes.py valida creación y serialización"
+      ],
+      "status": "done"
+    },
+    {
+      "id": 3,
+      "name": "cli_add_list",
+      "title": "Comandos add y list en el CLI",
+      "description": "Permite añadir una nota y listar todas las notas existentes.",
+      "acceptance": [
+        "`python -m src.cli add 'titulo' --body 'texto'` imprime el id creado",
+        "`python -m src.cli list` imprime una línea por nota: `<id>  <created_at>  <title>`",
+        "tests/test_cli.py cubre ambos comandos con un archivo temporal"
+      ],
+      "status": "done"
+    },
+    {
+      "id": 4,
+      "name": "cli_show_delete",
+      "title": "Comandos show y delete en el CLI",
+      "description": "Permite ver y eliminar notas por id.",
+      "acceptance": [
+        "`python -m src.cli show <id>` imprime título, fecha y cuerpo",
+        "`python -m src.cli delete <id>` elimina y confirma con un mensaje",
+        "Ambos comandos devuelven exit code != 0 si el id no existe",
+        "tests/test_cli.py cubre éxito y fallo"
+      ],
+      "status": "done"
+    },
+    {
+      "id": 5,
+      "name": "cli_search",
+      "title": "Comando search",
+      "description": "Búsqueda por substring en título o cuerpo (case-insensitive).",
+      "acceptance": [
+        "`python -m src.cli search 'palabra'` lista las notas que contienen la palabra",
+        "Si no hay coincidencias, exit code 1 y mensaje claro",
+        "tests/test_cli.py cubre coincidencia, no-coincidencia y case-insensitivity"
+      ],
+      "status": "done"
+    },
+    {
+      "id": 6,
+      "name": "cli_edit",
+      "title": "Comando edit",
+      "description": "Permite modificar el título y/o cuerpo de una nota existente por id.",
+      "acceptance": [
+        "`python -m src.cli edit <id> --title 'nuevo'` actualiza solo el título",
+        "`python -m src.cli edit <id> --body 'nuevo'` actualiza solo el cuerpo",
+        "Pasar ambos flags actualiza ambos campos en la misma llamada",
+        "Si no se pasa ningún flag, exit code != 0 y mensaje claro",
+        "Si el id no existe, exit code != 0 y mensaje en stderr",
+        "tests/test_cli.py cubre éxito (cada flag y combinado), id inexistente y ausencia de flags"
+      ],
+      "status": "done"
+    },
+    {
+      "id": 7,
+      "name": "cli_recent",
+      "title": "Comando recent",
+      "description": "Lista las N notas más recientes, ordenadas por created_at descendente.",
+      "acceptance": [
+        "`python -m src.cli recent` lista las 5 notas más recientes por defecto",
+        "`python -m src.cli recent --limit 10` permite cambiar el número",
+        "El orden es por `created_at` de más reciente a más antigua",
+        "Cada línea sigue el formato `<id>\\t<created_at>\\t<title>` (mismo que `list`)",
+        "Si no hay notas, exit code 0 y no imprime nada (consistente con `list`)",
+        "Si `--limit` es <= 0, exit code != 0 y mensaje claro en stderr",
+        "tests/test_cli.py cubre: orden por defecto, límite custom, archivo vacío, límite inválido"
+      ],
+      "sdd": true,
+      "status": "done"
+    },
+    {
+      "id": 8,
+      "name": "cli_count",
+      "title": "Comando count",
+      "description": "Muestra cuántas notas hay almacenadas.",
+      "acceptance": [
+        "`python -m src.cli count` imprime un entero único: el número total de notas",
+        "Si no hay notas, imprime `0`",
+        "El comando no modifica el archivo de notas",
+        "tests/test_cli.py cubre: archivo vacío y archivo con varias notas"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 9,
+      "name": "cli_export",
+      "title": "Comando export a Markdown",
+      "description": "Exporta todas las notas a un archivo Markdown legible por humanos.",
+      "acceptance": [
+        "`python -m src.cli export <ruta>` escribe todas las notas en `<ruta>` con formato Markdown",
+        "Cada nota aparece como sección con título de nivel 2 (`## <title>`), una línea con `created_at`, y el cuerpo como párrafo",
+        "Las notas se ordenan por `id` ascendente en el export",
+        "Si la ruta destino ya existe, exit code != 0 y mensaje claro en stderr (no sobreescribir por defecto)",
+        "Pasar `--force` permite sobreescribir un archivo existente",
+        "tests/test_cli.py cubre: export a ruta nueva, intento de sobreescritura sin `--force`, sobreescritura con `--force`"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 10,
+      "name": "cli_stats",
+      "title": "Comando stats",
+      "description": "Muestra estadísticas agregadas sobre las notas almacenadas.",
+      "acceptance": [
+        "`python -m src.cli stats` imprime: número total de notas, fecha de la nota más antigua, fecha de la nota más reciente, longitud media del cuerpo (entero, en caracteres)",
+        "El formato es un par `clave: valor` por línea",
+        "Si no hay notas, exit code 0 y un único mensaje `sin notas` por stdout",
+        "El comando no modifica el archivo de notas",
+        "tests/test_cli.py cubre: archivo vacío, archivo con una sola nota, archivo con varias notas"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 11,
+      "name": "cli_clear",
+      "title": "Comando clear (destructivo)",
+      "description": "Elimina todas las notas del archivo. Requiere confirmación explícita vía flag.",
+      "acceptance": [
+        "`python -m src.cli clear` SIN `--yes` imprime un mensaje pidiendo confirmación, NO borra nada y sale con exit code != 0",
+        "`python -m src.cli clear --yes` borra todas las notas y confirma con un mensaje del tipo `borradas N notas`",
+        "Después de un clear exitoso, `list` no imprime nada",
+        "Si el archivo de notas no existía, `clear --yes` sale con exit code 0 e informa `borradas 0 notas`",
+        "tests/test_cli.py cubre: sin `--yes` (no destructivo), con `--yes` y notas presentes, con `--yes` y archivo vacío"
+      ],
+      "sdd": true,
+      "status": "pending"
+    }
+  ]
+}
