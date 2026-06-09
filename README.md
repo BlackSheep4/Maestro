@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/maestro-banner.png" alt="Maestro" width="420">
+  <img src="assets/maestro-banner.jpg" alt="Maestro" width="480">
 </p>
 
 <h1 align="center">Maestro</h1>
@@ -20,7 +20,17 @@
 
 **Maestro** no es una aplicación: es una **capa de control y orquestación** que envuelve a
 los agentes de IA para que dejen de improvisar y empiecen a trabajar como un equipo
-disciplinado. Se apoya en cuatro pilares:
+disciplinado.
+
+Es una **plantilla genérica y reutilizable**, no un proyecto de ejemplo: la instalas sobre
+**cualquier** proyecto —nuevo (*greenfield*) o ya existente (*brownfield*)— y **se adapta a
+él**. En la primera sesión, el agente configura el stack en `harness.json`, rellena las
+secciones específicas de tu dominio (marcadas `HARNESS:FILL` en los `docs/`) y, si ya hay
+código, infiere tus features existentes. El mismo andamiaje encaja en un proyecto de
+Python, Node, Go o Rust: el proyecto sobre el que trabajas es siempre el tuyo, Maestro solo
+aporta la estructura.
+
+Se apoya en cuatro pilares:
 
 1. **El repositorio ES el sistema de control.** El estado vive en disco y en Git
    (`AGENTS.md`, `feature_list.json`, `progress/`, `docs/`), nunca en el chat ni en la
@@ -34,9 +44,9 @@ disciplinado. Se apoya en cuatro pilares:
 4. **Verificación ejecutable.** `init.sh` como árbitro objetivo, trazabilidad
    `R<n> → test` obligatoria, y hooks que ejecutan los tests tras cada edición.
 
-Es **políglota**: el stack (lenguaje, comando de tests, rutas) vive en `harness.json`, así
-que sirve igual para Python, Node, Go o Rust. No impone Node a tu proyecto — el CLI es
-bash puro y lee JSON con `jq` o `python3`.
+Y no impone dependencias a tu proyecto: el CLI es **bash puro** y lee su configuración JSON
+con `jq` o `python3` (el que tengas disponible), así que Maestro no te obliga a instalar
+Node.
 
 ## Instalación
 
