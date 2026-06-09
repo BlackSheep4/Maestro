@@ -25,8 +25,14 @@ implementar.
   el protocolo de onboarding: formula al humano las preguntas de stack (ver
   más abajo), genera `harness.json` con sus respuestas consultando
   `harness.example.json`, y solo entonces ejecuta `./init.sh`.
+- ❌ **No lances `spec_author` ni `implementer` sobre features marcadas `done`
+  por el `explorer`.** Esas features ya tienen código existente. Si el humano
+  quiere añadir specs retroactivos, debe cambiar el status manualmente a
+  `pending` primero.
 - ✅ Para cualquier tarea de código, lanza el subagente apropiado vía la
   herramienta `Agent`:
+  - `subagent_type: "explorer"` → onboarding brownfield: analiza el código
+    existente y propone el `feature_list.json` inicial (solo primera sesión).
   - `subagent_type: "spec_author"` → redacta
     `specs/<name>/{requirements,design,tasks}.md` para una feature `pending`
     con `"sdd": true`.
@@ -38,7 +44,18 @@ implementar.
 
 ### Protocolo de onboarding (primera sesión)
 
-Si `harness.json` no existe al arrancar, antes de cualquier otra acción:
+Al arrancar la primera sesión (`harness.json` no existe **o** `feature_list.json`
+está vacío), antes de cualquier otra acción:
+
+**PASO 1 — Detectar el modo:**
+
+- Si `src_dir` (de `harness.json`) contiene ficheros de código → modo **BROWNFIELD**.
+- Si `src_dir` está vacío o no existe → modo **GREENFIELD**.
+
+(Si `harness.json` aún no existe, ejecuta primero las preguntas de stack del
+modo GREENFIELD para generarlo, y luego evalúa `src_dir`.)
+
+**PASO 2 — Modo GREENFIELD:**
 
 1. Formula al humano este bloque de preguntas en un único mensaje:
 
@@ -74,6 +91,18 @@ Si `harness.json` no existe al arrancar, antes de cualquier otra acción:
    <language>. Ejecutando init.sh..."
 
 6. Ejecuta `./init.sh` y continúa con el protocolo de arranque normal.
+
+**PASO 3 — Modo BROWNFIELD:**
+
+1. Si `harness.json` no existe, ejecuta primero las preguntas de stack del
+   modo GREENFIELD (PASO 2.1–2.3) para generarlo.
+2. Lanza el subagente `explorer` con la instrucción:
+   "Analiza el proyecto existente en `<src_dir>` y ejecuta el protocolo
+   brownfield completo."
+3. El `explorer` propone al humano y **espera aprobación** (no escribe nada
+   en disco hasta que el humano apruebe). Este diálogo es parte del proceso.
+4. Tras la aprobación y la escritura en disco, ejecuta `./init.sh`.
+5. Continúa con el protocolo de arranque normal.
 
 ### Protocolo de arranque (al recibir la primera tarea)
 

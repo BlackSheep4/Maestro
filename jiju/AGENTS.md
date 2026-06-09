@@ -11,7 +11,10 @@
 1. Si `harness.json` no existe, ejecuta el protocolo de onboarding de
    `CLAUDE.md` antes de cualquier otra cosa. Si existe, ejecuta `./init.sh`
    directamente y verifica que termina sin errores. Si falla, **para** y
-   resuelve el entorno antes de tocar código.
+   resuelve el entorno antes de tocar código. Si `feature_list.json` está
+   vacío pero `src_dir` contiene código, el harness está en modo brownfield
+   pendiente de onboarding: el `leader` debe lanzar el `explorer` antes de
+   cualquier otra acción.
 2. Lee `progress/current.md` para entender en qué estado quedó la última sesión.
 3. Lee `feature_list.json`. Toda feature nueva (`"sdd": true`) pasa por
    **Spec Driven Development** — ver `docs/specs.md` y §4 de este archivo.
@@ -41,6 +44,8 @@
 | `docs/verification.md`       | Cómo verificar que tu trabajo funciona (incluye trazabilidad requirements)  | Antes de declarar una tarea como `done` |
 | `CHECKPOINTS.md`             | Criterios objetivos de "estado final correcto"                              | Para auto-evaluarte |
 | `.claude/agents/`            | Definiciones de subagentes (`leader`, `spec_author`, `implementer`, `reviewer`) | Si orquestas trabajo |
+| `.claude/agents/explorer.md` | Agente de onboarding brownfield. Solo se ejecuta en la primera sesión de un proyecto con código existente. | Solo durante onboarding brownfield |
+| `progress/explorer_brownfield.md` | Bitácora del onboarding brownfield: razonamiento del explorer, features inferidas, decisiones tomadas. | Si necesitas entender el estado inicial del harness |
 | `src/`                       | Código de la aplicación                                                     | Para implementar |
 | `tests/`                     | Tests automáticos                                                           | Para verificar |
 
