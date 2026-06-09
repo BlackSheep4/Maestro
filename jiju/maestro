@@ -13,6 +13,16 @@ MAESTRO_HOME="${MAESTRO_HOME:-$HOME/.maestro}"
 TEMPLATES="$MAESTRO_HOME/templates"
 SEP="────────────────────────────────────────────────────"
 
+# Categorías de fichero para `upgrade`:
+#  MERGE     — tienen HARNESS:REQUIRED + HARNESS:FILL → REQUIRED del template
+#              nuevo, FILL del proyecto preservado. (AGENTS/CLAUDE no tienen
+#              bloques FILL: el merge equivale a sobreescritura limpia.)
+#  OVERWRITE — puramente estructurales → se sobreescriben.
+#  NEVER     — propiedad del proyecto/agente → no se tocan jamás.
+MERGE_FILES="docs/architecture.md docs/conventions.md docs/specs.md docs/verification.md CHECKPOINTS.md AGENTS.md CLAUDE.md"
+OVERWRITE_FILES="init.sh harness.example.json .claude/settings.json .claude/agents/leader.md .claude/agents/spec_author.md .claude/agents/implementer.md .claude/agents/reviewer.md .claude/agents/explorer.md .claude/hooks/after_edit.sh .claude/hooks/before_stop.sh"
+NEVER_FILES="feature_list.json harness.json progress/current.md"
+
 # ── Colores (se desactivan si no hay tty o si NO_COLOR está puesto) ──
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'
@@ -25,6 +35,16 @@ ok()   { printf '%s✅ %s%s\n' "$GREEN" "$1" "$NC"; }
 err()  { printf '%s❌ %s%s\n' "$RED" "$1" "$NC" >&2; }
 info() { printf '%sℹ %s%s\n'  "$CYAN" "$1" "$NC"; }
 warn() { printf '%s⚠ %s%s\n'  "$YELLOW" "$1" "$NC"; }
+
+# version_ge <a> <b> → exit 0 si a >= b (compara semver con awk).
+version_ge() {
+  [ -n "$1" ] || return 1
+  awk -v a="$1" -v b="$2" 'BEGIN{
+    na=split(a,x,"."); nb=split(b,y,".");
+    for(i=1;i<=3;i++){ xi=(i<=na?x[i]+0:0); yi=(i<=nb?y[i]+0:0);
+      if(xi>yi) exit 0; if(xi<yi) exit 1 }
+    exit 0 }'
+}
 
 # ── Parser JSON: jq (preferido) o python3, igual que init.sh ──
 JT=""
@@ -99,7 +119,7 @@ Comandos:
   ${GREEN}init${NC}       Instala el harness en el directorio actual
   ${GREEN}status${NC}     Muestra el estado de las features del proyecto
   ${GREEN}check${NC}      Ejecuta ./init.sh y propaga su exit code (apto para CI)
-  ${GREEN}upgrade${NC}    (próximamente) Actualiza el harness preservando tu contenido
+  ${GREEN}upgrade${NC}    Actualiza el harness preservando tu contenido (HARNESS:FILL)
   ${GREEN}version${NC}    Muestra la versión de maestro
   ${GREEN}help${NC}       Muestra esta ayuda
 
@@ -249,13 +269,129 @@ cmd_check() {
   exit "$code"
 }
 
+# ── Merge de HARNESS:FILL (para upgrade) ──
+# Preserva la REGIÓN COMPLETA `<!-- HARNESS:FILL … <!-- /HARNESS:FILL -->` del
+# proyecto y reinyecta cada una en su posición dentro del template nuevo. Lo que
+# queda FUERA de las regiones FILL (las secciones HARNESS:REQUIRED) lo aporta el
+# template. Robusto a regiones multilínea y a varios bloques por fichero.
+#   merge_fill <template> <project>  → escribe el resultado a stdout
+merge_fill() {
+  awk '
+  FNR==NR {
+    if (!pin && index($0,"<!-- HARNESS:FILL")) { pin=1; pidx++; pblk[pidx]=$0
+      if (index($0,"<!-- /HARNESS:FILL -->")) pin=0
+      next }
+    if (pin) { pblk[pidx]=pblk[pidx] ORS $0
+      if (index($0,"<!-- /HARNESS:FILL -->")) pin=0
+      next }
+    next
+  }
+  {
+    if (!tin && index($0,"<!-- HARNESS:FILL")) { tin=1; tidx++; treg=$0
+      if (index($0,"<!-- /HARNESS:FILL -->")) { print (tidx in pblk ? pblk[tidx] : treg); tin=0 }
+      next }
+    if (tin) { treg=treg ORS $0
+      if (index($0,"<!-- /HARNESS:FILL -->")) { print (tidx in pblk ? pblk[tidx] : treg); tin=0 }
+      next }
+    print
+  }
+  ' "$2" "$1"
+}
+
+# ── Comando: upgrade ──
+cmd_upgrade() {
+  if [ ! -f .maestro-version ]; then
+    err 'No se encontró .maestro-version. Este proyecto puede haber instalado Maestro manualmente. Ejecuta "maestro init" en un directorio vacío para una instalación limpia.'
+    exit 1
+  fi
+  if [ ! -d "$TEMPLATES" ]; then
+    err "No encuentro los templates en $TEMPLATES. Reinstala maestro con install.sh."
+    exit 1
+  fi
+
+  local installed current
+  installed=$(tr -d '[:space:]' < .maestro-version)
+  current="$MAESTRO_VERSION"
+
+  if [ "$installed" = "$current" ]; then
+    ok "Ya tienes la versión más reciente de Maestro (v$current). No hay nada que actualizar."
+    return
+  fi
+  if ! version_ge "$current" "$installed"; then
+    warn "Tu proyecto está en v$installed y el maestro instalado es v$current (más antiguo)."
+    warn "Reinstala maestro (install.sh) para obtener una versión >= la tuya. No se ha tocado nada."
+    return
+  fi
+
+  local merged=() overwritten=() untouched=() warnings=()
+  local rel tpl tmp pc tc f w
+
+  # Merge inteligente (REQUIRED actualizado, FILL preservado).
+  for rel in $MERGE_FILES; do
+    tpl="$TEMPLATES/$rel"
+    [ -f "$tpl" ] || continue
+    if [ -f "$rel" ]; then
+      pc=$(grep -cF '<!-- HARNESS:FILL' "$rel" 2>/dev/null || true)
+      tc=$(grep -cF '<!-- HARNESS:FILL' "$tpl" 2>/dev/null || true)
+      tmp=$(mktemp)
+      merge_fill "$tpl" "$rel" > "$tmp"
+      mv "$tmp" "$rel"
+      if [ "${pc:-0}" -gt 0 ] 2>/dev/null; then
+        merged+=("$rel — HARNESS:REQUIRED actualizado, FILL preservado")
+      else
+        merged+=("$rel — actualizado (sin bloques FILL)")
+      fi
+      if [ "${pc:-0}" != "${tc:-0}" ]; then
+        warnings+=("$rel: nº de bloques HARNESS:FILL difiere (proyecto $pc, template $tc); revisa el fichero.")
+      fi
+    else
+      mkdir -p "$(dirname "$rel")"; cp "$tpl" "$rel"; overwritten+=("$rel")
+    fi
+  done
+
+  # Sobreescritura de ficheros estructurales.
+  for rel in $OVERWRITE_FILES; do
+    tpl="$TEMPLATES/$rel"
+    [ -f "$tpl" ] || continue
+    mkdir -p "$(dirname "$rel")"
+    cp "$tpl" "$rel"
+    case " init.sh .claude/hooks/after_edit.sh .claude/hooks/before_stop.sh " in
+      *" $rel "*) chmod +x "$rel" ;;
+    esac
+    overwritten+=("$rel")
+  done
+
+  # Intocables.
+  for rel in $NEVER_FILES; do [ -e "$rel" ] && untouched+=("$rel"); done
+
+  printf '%s\n' "$current" > .maestro-version
+
+  echo
+  ok "Maestro actualizado: v$installed → v$current"
+  if [ "${#merged[@]}" -gt 0 ]; then
+    echo; echo "Ficheros actualizados (merge):"
+    for f in "${merged[@]}"; do printf '%s  %s%s\n' "$GRAY" "$f" "$NC"; done
+  fi
+  if [ "${#overwritten[@]}" -gt 0 ]; then
+    echo; echo "Ficheros sobreescritos:"
+    for f in "${overwritten[@]}"; do printf '%s  %s%s\n' "$GRAY" "$f" "$NC"; done
+  fi
+  if [ "${#untouched[@]}" -gt 0 ]; then
+    echo; echo "Ficheros sin cambios (nunca se tocan):"
+    for f in "${untouched[@]}"; do printf '%s  %s%s\n' "$GRAY" "$f" "$NC"; done
+  fi
+  if [ "${#warnings[@]}" -gt 0 ]; then
+    echo; for w in "${warnings[@]}"; do warn "$w"; done
+  fi
+}
+
 # ── Dispatch ──
 cmd="${1:-help}"
 case "$cmd" in
   init)               shift; cmd_init "$@" ;;
   status)             shift; cmd_status "$@" ;;
   check)              shift; cmd_check "$@" ;;
-  upgrade)            err 'maestro upgrade aún no está disponible en esta versión (próximamente).'; exit 1 ;;
+  upgrade)            shift; cmd_upgrade "$@" ;;
   version|-v|--version) echo "maestro v$MAESTRO_VERSION" ;;
   help|-h|--help)     usage ;;
   *)                  err "Comando desconocido: $cmd"; echo; usage; exit 1 ;;
