@@ -65,7 +65,7 @@ terminal nueva (o `source` tu rc) y ya tienes el comando `maestro`.
 | Variable            | Por defecto              | Para qué |
 |---------------------|--------------------------|----------|
 | `MAESTRO_HOME`      | `~/.maestro`             | Dónde instalar |
-| `MAESTRO_REF`       | `main`  | Rama/tag/sha del repo a instalar |
+| `MAESTRO_REF`       | último tag estable (p. ej. `v1.0.0`) | Rama/tag/sha del repo a instalar |
 | `MAESTRO_REPO`      | `BlackSheep4/Maestro`    | `owner/repo` de origen |
 | `MAESTRO_LOCAL_SRC` | —                        | Instala desde un clon local en vez de descargar |
 

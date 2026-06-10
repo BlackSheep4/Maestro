@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extraer versión del tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verificar coherencia de versión
+        run: |
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          SCRIPT_VERSION=$(grep '^MAESTRO_VERSION=' maestro | cut -d'"' -f2)
+          if [ "$TAG_VERSION" != "$SCRIPT_VERSION" ]; then
+            echo "❌ El tag es v$TAG_VERSION pero MAESTRO_VERSION en el script es $SCRIPT_VERSION"
+            echo "Actualiza MAESTRO_VERSION en el script 'maestro' antes de crear el tag."
+            exit 1
+          fi
+          echo "✅ Versiones coherentes: v$TAG_VERSION"
+
+      - name: Extraer notas del CHANGELOG
+        id: changelog
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          # Extrae el bloque entre ## [VERSION] y el siguiente ## [
+          NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            echo "⚠ No se encontraron notas para $TAG en CHANGELOG.md"
+            NOTES="Sin notas de release. Consulta el historial de commits."
+          fi
+          # Guardar en fichero para evitar problemas con caracteres especiales
+          echo "$NOTES" > /tmp/release_notes.md
+          echo "✅ Notas extraídas para $TAG"
+
+      - name: Actualizar MAESTRO_REF en install.sh
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          # Reemplaza el valor por defecto de MAESTRO_REF con el nuevo tag
+          sed -i "s|MAESTRO_REF=\"\${MAESTRO_REF:-v[^}]*}\"|MAESTRO_REF=\"\${MAESTRO_REF:-$TAG}\"|" install.sh
+          echo "✅ install.sh actualizado: MAESTRO_REF apunta a $TAG"
+
+      - name: Commit y re-tag con install.sh actualizado
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add install.sh
+          # Solo hace commit si install.sh realmente cambió
+          if git diff --cached --quiet; then
+            echo "install.sh no cambió, no hay commit necesario."
+          else
+            git commit -m "chore: update install.sh for $TAG [skip ci]"
+            # Re-tag --force sobre el nuevo commit
+            git tag -f "$TAG"
+            git push origin "$TAG" --force
+            echo "✅ Tag $TAG re-creado sobre el commit actualizado"
+          fi
+
+      - name: Crear GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: /tmp/release_notes.md
+          draft: false
+          prerelease: false

@@ -6,7 +6,7 @@
 #
 # Variables de entorno:
 #   MAESTRO_HOME       destino (por defecto ~/.maestro)
-#   MAESTRO_REF        rama/tag/sha del repo a instalar (por defecto la rama por defecto)
+#   MAESTRO_REF        rama/tag/sha del repo a instalar (por defecto, el último tag estable)
 #   MAESTRO_REPO       owner/repo (por defecto BlackSheep4/Maestro)
 #   MAESTRO_LOCAL_SRC  instala desde un clon local del harness en vez de descargar
 #   MAESTRO_SUBDIR     subdirectorio del repo donde vive el harness (por defecto la raíz)
@@ -14,7 +14,9 @@
 set -eu
 
 MAESTRO_REPO="${MAESTRO_REPO:-BlackSheep4/Maestro}"
-MAESTRO_REF="${MAESTRO_REF:-main}"
+# NOTA: este valor lo actualiza automáticamente .github/workflows/release.yml
+# en cada release. No lo edites a mano salvo que sepas lo que haces.
+MAESTRO_REF="${MAESTRO_REF:-v1.0.0}"
 MAESTRO_HOME="${MAESTRO_HOME:-$HOME/.maestro}"
 # Subdirectorio del repo donde vive el harness. Vacío = raíz del repo.
 SUBDIR="${MAESTRO_SUBDIR:-}"

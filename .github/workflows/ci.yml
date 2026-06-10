@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags-ignore:
+      - '**'   # los tags los gestiona release.yml, no ci.yml
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verificar sintaxis de bash (maestro, install.sh, init.sh)
+        run: |
+          bash -n maestro     && echo "✅ maestro: sintaxis OK"
+          bash -n install.sh  && echo "✅ install.sh: sintaxis OK"
+          bash -n init.sh     && echo "✅ init.sh: sintaxis OK"
+          for hook in .claude/hooks/*.sh; do
+            bash -n "$hook" && echo "✅ $hook: sintaxis OK"
+          done
+
+      - name: Verificar que feature_list.json es JSON válido
+        run: |
+          python3 -m json.tool feature_list.json > /dev/null
+          echo "✅ feature_list.json: JSON válido"
+
+      - name: Verificar que harness.example.json es JSON válido
+        run: |
+          python3 -m json.tool harness.example.json > /dev/null
+          echo "✅ harness.example.json: JSON válido"
+
+      - name: Verificar que .claude/settings.json es JSON válido
+        run: |
+          python3 -m json.tool .claude/settings.json > /dev/null
+          echo "✅ .claude/settings.json: JSON válido"
+
+      - name: Verificar que CHANGELOG.md tiene entrada para la versión actual
+        run: |
+          VERSION=$(grep '^MAESTRO_VERSION=' maestro | cut -d'"' -f2)
+          if ! grep -q "## \[$VERSION\]" CHANGELOG.md; then
+            echo "❌ CHANGELOG.md no tiene entrada para v$VERSION"
+            echo "Añade la sección ## [$VERSION] antes de mergear a main."
+            exit 1
+          fi
+          echo "✅ CHANGELOG.md tiene entrada para v$VERSION"
+
+      - name: Verificar que todos los ficheros del harness existen
+        run: |
+          REQUIRED_FILES="
+            AGENTS.md CLAUDE.md CHECKPOINTS.md init.sh harness.example.json
+            feature_list.json docs/architecture.md docs/conventions.md
+            docs/specs.md docs/verification.md .claude/settings.json
+            .claude/agents/leader.md .claude/agents/spec_author.md
+            .claude/agents/implementer.md .claude/agents/reviewer.md
+            .claude/agents/explorer.md .claude/hooks/after_edit.sh
+            .claude/hooks/before_stop.sh progress/current.md
+          "
+          missing=0
+          for f in $REQUIRED_FILES; do
+            if [ ! -f "$f" ]; then
+              echo "❌ Falta fichero del harness: $f"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] && echo "✅ Todos los ficheros del harness presentes"
+          exit $missing
+
+      - name: Verificar marcadores HARNESS en docs
+        run: |
+          # Cada bloque HARNESS:REQUIRED debe tener su cierre /HARNESS:REQUIRED
+          # Cada bloque HARNESS:FILL debe tener su cierre /HARNESS:FILL
+          errors=0
+          for f in docs/*.md CHECKPOINTS.md; do
+            opens=$(grep -c '<!-- HARNESS:REQUIRED' "$f" 2>/dev/null || true)
+            closes=$(grep -c '<!-- /HARNESS:REQUIRED' "$f" 2>/dev/null || true)
+            if [ "$opens" != "$closes" ]; then
+              echo "❌ $f: $opens aperturas HARNESS:REQUIRED pero $closes cierres"
+              errors=$((errors+1))
+            fi
+            opens=$(grep -c '<!-- HARNESS:FILL' "$f" 2>/dev/null || true)
+            closes=$(grep -c '<!-- /HARNESS:FILL' "$f" 2>/dev/null || true)
+            if [ "$opens" != "$closes" ]; then
+              echo "❌ $f: $opens aperturas HARNESS:FILL pero $closes cierres"
+              errors=$((errors+1))
+            fi
+          done
+          [ "$errors" -eq 0 ] && echo "✅ Marcadores HARNESS coherentes en todos los docs"
+          exit $errors
