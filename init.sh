@@ -112,6 +112,12 @@ for f in AGENTS.md feature_list.json harness.json progress/current.md docs/archi
   fi
 done
 
+if [ ! -f "progress/onboarding.md" ]; then
+  warn "progress/onboarding.md no existe. Si es un proyecto nuevo, ejecuta 'maestro init'."
+else
+  ok "Existe progress/onboarding.md"
+fi
+
 echo ""
 echo "── 3. Validando feature_list.json y specs ─────────────"
 

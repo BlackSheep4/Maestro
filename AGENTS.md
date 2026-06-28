@@ -50,6 +50,7 @@
 | `harness.json`               | Configuración del stack del proyecto (lenguaje, versión mínima, comando de tests). Generado por el agente en la primera sesión mediante asunción dinámica. | Siempre, al empezar |
 | `harness.example.json`       | Referencia de configuraciones para stacks comunes. El agente lo consulta al generar `harness.json`. No editar manualmente. | Solo el agente, durante onboarding |
 | `progress/current.md`        | Estado de la sesión actual                                                  | Siempre, al empezar |
+| `progress/onboarding.md`     | Estado paso a paso del onboarding. El leader lo lee al arrancar cada sesión si existe y no está marcado como completado. | Al arrancar, si el onboarding puede estar incompleto |
 | `progress/history.md`        | Bitácora append-only de sesiones anteriores                                 | Si necesitas contexto histórico |
 | `specs/<feature>/`           | `requirements.md` + `design.md` + `tasks.md` (Kiro-style)                   | Antes de implementar cualquier feature con `"sdd": true` |
 | `progress/spec_interview_<feature>.md` | Preguntas de clarificación del `spec_author` y respuestas del humano | Si necesitas entender las decisiones que dieron forma a un spec |

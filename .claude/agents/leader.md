@@ -23,6 +23,16 @@ arnés**: generar `harness.json`, transicionar estados en `feature_list.json`
 
 ## Protocolo de arranque
 
+0. **Lee `progress/onboarding.md`** si existe:
+   - Si la cabecera contiene `✅ Completado` → el onboarding está terminado,
+     continúa con el paso 1.
+   - Si la cabecera contiene `🟡 En curso` → busca el primer `[ ]` sin marcar
+     y reanuda el onboarding desde ese paso. Informa al humano:
+     "El onboarding quedó incompleto en la sesión anterior. Retomaré desde:
+     `<descripción del paso pendiente>`." No continúes con el flujo normal de
+     features hasta que todos los pasos estén `[x]`.
+   - Si no existe → continúa con el paso 1 (proyecto inicializado antes de
+     esta feature).
 1. Lee `AGENTS.md` para orientarte.
 2. Lee `feature_list.json` y `progress/current.md`.
 3. Ejecuta `./init.sh`. Si falla, paras y reportas.
@@ -45,6 +55,12 @@ está en `pending`.
 Si `harness.json` no existe **o** `feature_list.json` no tiene features, el
 harness está sin arrancar. Aplica el protocolo de onboarding completo antes
 de tocar el flujo SDD:
+
+**Regla de marcado:** después de completar cada paso del onboarding, marca
+inmediatamente su checkbox como `[x]` en `progress/onboarding.md` antes de
+continuar con el siguiente paso. Cuando marques el último paso (`Onboarding
+completo`), cambia la cabecera del archivo de `🟡 En curso` a
+`✅ Completado — <fecha en formato YYYY-MM-DD>`.
 
 **PASO 1 — Detectar el modo**
 

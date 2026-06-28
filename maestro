@@ -148,6 +148,58 @@ cmd_init() {
   fi
 
   local copied=() rel
+
+  mkdir -p progress
+  if [ ! -f progress/onboarding.md ]; then
+    if [ "$mode" = "brownfield" ]; then
+      cat > progress/onboarding.md <<'ONBOARDING_EOF'
+# Estado del onboarding
+> 🟡 En curso
+
+## Modo
+brownfield
+
+## Pasos comunes
+- [ ] harness.json generado
+- [ ] FILL mecánicos completados (CHECKPOINTS.md, docs/verification.md, docs/specs.md)
+
+## Pasos brownfield
+- [ ] explorer lanzado
+- [ ] Propuesta del explorer aprobada por el humano
+- [ ] feature_list.json escrito por el explorer
+- [ ] docs/architecture.md rellenado por el explorer
+- [ ] docs/conventions.md rellenado por el explorer
+- [ ] ./init.sh ejecutado verde
+
+## Completado
+- [ ] Onboarding completo
+ONBOARDING_EOF
+    else
+      cat > progress/onboarding.md <<'ONBOARDING_EOF'
+# Estado del onboarding
+> 🟡 En curso
+
+## Modo
+greenfield
+
+## Pasos comunes
+- [ ] harness.json generado
+- [ ] FILL mecánicos completados (CHECKPOINTS.md, docs/verification.md, docs/specs.md)
+
+## Pasos greenfield
+- [ ] docs/architecture.md rellenado
+- [ ] docs/conventions.md rellenado
+- [ ] docs/verification.md ejemplos de integración rellenados
+- [ ] ./init.sh ejecutado verde
+- [ ] Primera feature inscrita en feature_list.json
+
+## Completado
+- [ ] Onboarding completo
+ONBOARDING_EOF
+    fi
+    copied+=("progress/onboarding.md")
+  fi
+
   while IFS= read -r rel; do
     [ -n "$rel" ] || continue
     if [ -e "$rel" ]; then continue; fi          # nunca pisa nada existente
