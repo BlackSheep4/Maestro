@@ -8,11 +8,11 @@
 
 ## 1. Antes de empezar (obligatorio)
 
-1. Si `harness.json` no existe, ejecuta el protocolo de onboarding de
-   `CLAUDE.md` antes de cualquier otra cosa. Si existe, ejecuta `./init.sh`
-   directamente y verifica que termina sin errores. Si falla, **para** y
-   resuelve el entorno antes de tocar código. Si `feature_list.json` está
-   vacío pero `src_dir` contiene código, el harness está en modo brownfield
+1. Si `harness.json` no existe, el leader aplica su protocolo de onboarding
+   (ver `.claude/agents/leader.md`) antes de cualquier otra acción. Si existe,
+   ejecuta `./init.sh` directamente y verifica que termina sin errores. Si falla,
+   **para** y resuelve el entorno antes de tocar código. Si `feature_list.json`
+   está vacío pero `src_dir` contiene código, el harness está en modo brownfield
    pendiente de onboarding: el `leader` debe lanzar el `explorer` antes de
    cualquier otra acción.
 2. Lee `progress/current.md` para entender en qué estado quedó la última sesión.
@@ -79,22 +79,13 @@
 
 ## 4. Flujo de trabajo (SDD)
 
+El flujo completo vive en `.claude/agents/leader.md` y `docs/specs.md`. Resumen:
+
 ```
 pending → [spec_author] → spec_ready → ⏸ HUMANO → in_progress → [implementer → reviewer] → done
 ```
 
-1. El leader detecta la primera feature `pending` con `"sdd": true`.
-2. El leader lanza `spec_author`, que crea
-   `specs/<name>/{requirements,design,tasks}.md` y marca el status como
-   `spec_ready`.
-3. **Pausa.** El humano lee el spec en `specs/<name>/` y aprueba (o pide cambios).
-4. Una vez aprobado, el leader cambia el status a `in_progress` y lanza `implementer`.
-5. El implementer ejecuta `tasks.md` una a una, marcándolas `[x]`.
-6. El reviewer verifica trazabilidad `R<n>` ↔ test y tasks completas;
-   aprueba o rechaza. Escribe su veredicto en `progress/review_<name>.md`.
-7. Si el veredicto es `APPROVED`, **el leader** marca `done` y mueve el resumen
-   a `progress/history.md`. Si es `CHANGES_REQUESTED`, el leader relanza al
-   implementer con los cambios pedidos.
+Toda feature con `"sdd": true` pasa obligatoriamente por este flujo.
 
 ## 5. Cierre de sesión (lifecycle)
 
