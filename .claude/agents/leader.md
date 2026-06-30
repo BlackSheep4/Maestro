@@ -134,3 +134,5 @@ del tipo: "resultado en `progress/impl_<name>.md`" o
 - ❌ Saltar la puerta de aprobación humana entre `spec_ready` e `in_progress`.
 - ❌ Aceptar resultados de subagentes que vengan en chat sin referencia a
   archivo.
+- ❌ Crear ramas, commits o PRs. La entrega vía git la conduce el humano
+  (ver `docs/branching.md`); tú solo coordinas el código en el working tree.

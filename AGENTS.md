@@ -57,6 +57,7 @@
 | `docs/conventions.md`        | Reglas de estilo, nombres, estructura                                       | Antes de escribir código |
 | `docs/specs.md`              | Proceso SDD: EARS notation, los 3 archivos, puerta de aprobación humana     | Antes de redactar o leer un spec |
 | `docs/verification.md`       | Cómo verificar que tu trabajo funciona (incluye trazabilidad requirements)  | Antes de declarar una tarea como `done` |
+| `docs/branching.md`          | Convención de ramas + release automático (PR→CI→release). Generado por `maestro init`. | Antes de crear una rama, abrir un PR o entregar una feature |
 | `CHECKPOINTS.md`             | Criterios objetivos de "estado final correcto"                              | Para auto-evaluarte |
 | `.claude/agents/`            | Definiciones de subagentes (`leader`, `spec_author`, `implementer`, `reviewer`) | Si orquestas trabajo |
 | `.claude/agents/explorer.md` | Agente de onboarding brownfield. Solo se ejecuta en la primera sesión de un proyecto con código existente. | Solo durante onboarding brownfield |
@@ -95,6 +96,20 @@ pending → [spec_author] → spec_ready → ⏸ HUMANO → in_progress → [imp
 7. Si el veredicto es `APPROVED`, **el leader** marca `done` y mueve el resumen
    a `progress/history.md`. Si es `CHANGES_REQUESTED`, el leader relanza al
    implementer con los cambios pedidos.
+
+### Entrega: ramas, PR y release (lo conduce el humano)
+
+El ciclo SDD de arriba trabaja sobre el working tree y termina en `done`. La
+**entrega** a través de git la conduce el **humano**, no los agentes:
+
+- El humano crea la rama según `docs/branching.md` (`feature/<x>-major|minor` o
+  `fix/<x>`), abre el PR hacia `main` y lo mergea.
+- Al mergear, los workflows de `.github/` calculan la versión desde el nombre de
+  rama y publican el GitHub Release automáticamente.
+- Los agentes **no** crean ramas, commits ni PRs: solo dejan el código y los
+  tests verdes en el working tree.
+
+Convención y regla de versionado completas en `docs/branching.md`.
 
 ## 5. Cierre de sesión (lifecycle)
 
