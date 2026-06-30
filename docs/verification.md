@@ -46,6 +46,21 @@ El `implementer` documenta el mapa en `progress/impl_<name>.md`:
 - R3 → `test_<feature>_<caso_alternativo>`
 ```
 
+### Nivel 5 — Checks de calidad (gate automático, obligatorio)
+
+`init.sh` ejecuta los **checks de calidad** declarados en el campo `checks` de
+`harness.json`: linter, formato, typecheck, código muerto, complejidad y
+duplicación ("no spaghetti") y seguridad, según el stack. Cada check tiene una
+`severity`:
+
+- `block` — si falla, `init.sh` termina en rojo y la feature **no** puede cerrarse.
+- `warn` — informa pero no bloquea.
+
+El catálogo de herramientas recomendadas por lenguaje vive en
+`harness.example.json`; el agente de onboarding propone el set y el humano lo
+aprueba. Las herramientas deben estar instaladas (en local y, en CI, vía el
+setup del workflow). Una feature no está `done` si algún check `block` está rojo.
+
 ## Anti-patrones (no hacer)
 
 - ❌ "He añadido el comando, debería funcionar." → falta test ejecutable.

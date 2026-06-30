@@ -226,7 +226,54 @@ else
 fi
 
 echo ""
-echo "── 5. Resumen ──────────────────────────────────────────"
+echo "── 5. Checks de calidad ────────────────────────────────"
+
+# Lee el campo `checks` de harness.json: validaciones de calidad específicas del
+# stack (lint, formato, typecheck, código muerto, complejidad, seguridad). Una
+# línea por check: name␟cmd␟severity (\x1f, no-tab, igual que feat_lines).
+# severity: `block` (rojo → bloquea el cierre) | `warn` (informa, no bloquea).
+# Campo ausente → se omite con aviso (retrocompatible con harness.json sin checks).
+checks_lines() {
+  if [ "$JSON_TOOL" = "jq" ]; then
+    jq -r '(.checks // [])[] | [(.name // ""), (.cmd // ""), (.severity // "block")] | join("")' harness.json
+  else
+    python3 -c "import json
+SEP='\x1f'
+for c in json.load(open('harness.json')).get('checks') or []:
+    print(SEP.join([c.get('name') or '', c.get('cmd') or '', c.get('severity') or 'block']))"
+  fi
+}
+
+checks_found=0
+while IFS=$(printf '\037') read -r cname ccmd cseverity; do
+  [ -n "$cname$ccmd" ] || continue
+  checks_found=1
+  [ -n "$cseverity" ] || cseverity="block"
+  if [ -z "$ccmd" ]; then
+    warn "check '$cname' sin comando (cmd vacío): se omite"
+    continue
+  fi
+  cout=$(bash -c "$ccmd" 2>&1); crc=$?
+  if [ "$crc" -eq 0 ]; then
+    ok "check '$cname' OK"
+  elif [ "$cseverity" = "warn" ]; then
+    warn "check '$cname' falló (severity=warn, no bloquea):"
+    printf '%s\n' "$cout" | sed 's/^/    /'
+  else
+    fail "check '$cname' falló (severity=block):"
+    printf '%s\n' "$cout" | sed 's/^/    /'
+    EXIT_CODE=1
+  fi
+done <<EOF
+$(checks_lines)
+EOF
+
+if [ "$checks_found" -eq 0 ]; then
+  warn "Sin checks de calidad en harness.json (campo 'checks'). El onboarding debería proponerlos desde harness.example.json."
+fi
+
+echo ""
+echo "── 6. Resumen ──────────────────────────────────────────"
 
 if [ $EXIT_CODE -eq 0 ]; then
   ok "Entorno listo. Puedes empezar a trabajar."

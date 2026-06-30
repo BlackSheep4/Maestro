@@ -1,5 +1,5 @@
 {
-  "_comment": "Fichero de referencia para el agente. No editar manualmente. El agente lo consulta al generar harness.json mediante asunción dinámica.",
+  "_comment": "Fichero de referencia para el agente. No editar manualmente. El agente lo consulta al generar harness.json mediante asunción dinámica. El bloque 'checks' es el CATÁLOGO de validaciones de calidad por lenguaje (lint, formato, typecheck, código muerto, complejidad/duplicación, seguridad): el agente de onboarding propone el set al humano y lo aprueba. init.sh los ejecuta; severity 'block' bloquea el cierre, 'warn' solo informa. Los comandos elegidos devuelven código ≠0 cuando hay violación. Requieren tener instaladas las herramientas (en local y, en CI, vía el setup del workflow).",
   "examples": {
     "python": {
       "stack": {
@@ -12,7 +12,15 @@
         "test_cmd": "python3 -m pytest",
         "src_dir": "src",
         "test_dir": "tests"
-      }
+      },
+      "checks": [
+        {"name": "lint",      "cmd": "ruff check .",          "severity": "block"},
+        {"name": "format",    "cmd": "ruff format --check .", "severity": "block"},
+        {"name": "typecheck",  "cmd": "mypy src",             "severity": "block"},
+        {"name": "deadcode",   "cmd": "vulture src",          "severity": "block"},
+        {"name": "complexity", "cmd": "xenon --max-absolute B --max-modules B --max-average A src", "severity": "block"},
+        {"name": "security",   "cmd": "pip-audit",            "severity": "block"}
+      ]
     },
     "python_unittest": {
       "stack": {
@@ -25,7 +33,15 @@
         "test_cmd": "python3 -m unittest discover -s tests -v",
         "src_dir": "src",
         "test_dir": "tests"
-      }
+      },
+      "checks": [
+        {"name": "lint",      "cmd": "ruff check .",          "severity": "block"},
+        {"name": "format",    "cmd": "ruff format --check .", "severity": "block"},
+        {"name": "typecheck",  "cmd": "mypy src",             "severity": "block"},
+        {"name": "deadcode",   "cmd": "vulture src",          "severity": "block"},
+        {"name": "complexity", "cmd": "xenon --max-absolute B --max-modules B --max-average A src", "severity": "block"},
+        {"name": "security",   "cmd": "pip-audit",            "severity": "block"}
+      ]
     },
     "node": {
       "stack": {
@@ -38,7 +54,15 @@
         "test_cmd": "npm test",
         "src_dir": "src",
         "test_dir": "tests"
-      }
+      },
+      "checks": [
+        {"name": "lint",      "cmd": "npx eslint .",          "severity": "block"},
+        {"name": "format",    "cmd": "npx prettier --check .","severity": "block"},
+        {"name": "typecheck", "cmd": "npx tsc --noEmit",      "severity": "block"},
+        {"name": "deadcode",    "cmd": "npx knip",            "severity": "block"},
+        {"name": "duplication", "cmd": "npx jscpd --threshold 0 src", "severity": "block"},
+        {"name": "security",    "cmd": "npm audit --audit-level=high", "severity": "block"}
+      ]
     },
     "go": {
       "stack": {
@@ -51,7 +75,14 @@
         "test_cmd": "go test ./...",
         "src_dir": ".",
         "test_dir": "."
-      }
+      },
+      "checks": [
+        {"name": "vet",         "cmd": "go vet ./...",              "severity": "block"},
+        {"name": "format",      "cmd": "test -z \"$(gofmt -l .)\"", "severity": "block"},
+        {"name": "staticcheck", "cmd": "staticcheck ./...",         "severity": "block"},
+        {"name": "complexity",  "cmd": "gocyclo -over 15 .",        "severity": "block"},
+        {"name": "security",    "cmd": "govulncheck ./...",         "severity": "block"}
+      ]
     },
     "rust": {
       "stack": {
@@ -59,7 +90,13 @@
         "test_cmd": "cargo test",
         "src_dir": "src",
         "test_dir": "tests"
-      }
+      },
+      "checks": [
+        {"name": "lint",     "cmd": "cargo clippy -- -D warnings", "severity": "block"},
+        {"name": "format",   "cmd": "cargo fmt --check",           "severity": "block"},
+        {"name": "deadcode", "cmd": "cargo machete",               "severity": "block"},
+        {"name": "security", "cmd": "cargo audit",                 "severity": "block"}
+      ]
     }
   }
 }

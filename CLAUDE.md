@@ -82,7 +82,14 @@ modo GREENFIELD para generarlo, y luego evalúa `src_dir`.)
    encontrar el ejemplo más cercano al stack declarado y úsalo como
    base para generar `harness.json` con los valores reales del humano.
 
-3. Escribe `harness.json` en la raíz del proyecto.
+3. Escribe `harness.json` en la raíz del proyecto. **Incluye el bloque `checks`**
+   del ejemplo del stack (catálogo de calidad: lint, formato, typecheck, código
+   muerto, complejidad/duplicación, seguridad) y **proponlo al humano para
+   aprobación** antes de seguir:
+   el gate es estricto (todo `block`), así que el humano confirma el set o lo
+   ajusta (quitar un check, bajar alguno a `warn`). Esto es clave en brownfield,
+   donde un set completo puede salir en rojo el primer día. `init.sh` ejecuta
+   estos `checks`; ver `docs/verification.md`, Nivel 5.
 
 4. **Rellena los `HARNESS:FILL` que NO requieren preguntar al humano tras
    generar `harness.json`:** se completan a partir de `harness.json` y del
