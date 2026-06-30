@@ -114,8 +114,18 @@ Cuando el humano responde:
    alternativa descartada con justificación.
 5. Redacta `tasks.md`: pasos discretos en orden, cada uno con `[ ]` y la
    lista de `R<n>` que cubre.
-6. Cambia el `status` de esa feature a `spec_ready` en `feature_list.json`.
-7. **PARA**. No invoques al implementer. Espera la aprobación humana.
+6. **Propón el nivel de release.** Evalúa la naturaleza del cambio y escribe el
+   campo `release` de la feature en `feature_list.json`:
+   - `major` — rompe compatibilidad: cambia o elimina una firma/comportamiento
+     público existente, requiere migración.
+   - `minor` — añade funcionalidad nueva compatible, sin romper lo existente.
+   - `patch` — corrige un comportamiento defectuoso, sin API nueva.
+   Justifica la elección en una línea al final de `design.md` (p. ej.
+   "Nivel de release: minor — añade el comando X sin tocar los existentes").
+   Es una **propuesta**: el humano la revisa en la puerta de aprobación y puede
+   cambiarla. El leader derivará de este campo el nombre de la rama.
+7. Cambia el `status` de esa feature a `spec_ready` en `feature_list.json`.
+8. **PARA**. No invoques al implementer. Espera la aprobación humana.
 
 ## Reglas duras
 
@@ -129,6 +139,9 @@ Cuando el humano responde:
   soportados.
 - ✅ Cada `R<n>` que escribes DEBE ser verificable por un test concreto.
   Si no lo es, parte el requirement o márcalo como blocker.
+- ✅ Siempre propones un `release` válido (`major`/`minor`/`patch`); nunca lo
+  dejas sin declarar. Ante la duda entre dos niveles, elige el **más alto** y
+  explícalo: es más seguro sobre-comunicar un breaking change que ocultarlo.
 
 ## Comunicación
 

@@ -73,11 +73,14 @@ Mira el status de la primera feature no-`done` / no-`blocked` en
    en un único bloque). Si lo hace, espera las respuestas antes de continuar.
    Este diálogo es parte del proceso, no una interrupción.
 2. El `spec_author` redacta
-   `specs/<name>/{requirements.md, design.md, tasks.md}` y cambia el status
-   a `spec_ready`.
-3. **PARAS**. No lanzas implementer. Tu mensaje al humano:
-   > "Spec listo en `specs/<name>/`. Revísalo y di **'aprobado'** para
-   > continuar con la implementación, o pídeme cambios."
+   `specs/<name>/{requirements.md, design.md, tasks.md}`, **propone el nivel de
+   `release`** (major/minor/patch, justificado en `design.md`) y cambia el
+   status a `spec_ready`.
+3. **PARAS**. No lanzas implementer. Tu mensaje al humano incluye el `release`
+   propuesto para que también lo valide:
+   > "Spec listo en `specs/<name>/` (release propuesto: **<nivel>**). Revísalo
+   > y di **'aprobado'** para continuar con la implementación, o pídeme cambios
+   > (incluido cambiar el nivel de release)."
 
 ### Caso B — status == `spec_ready` Y el humano acaba de aprobar
 
