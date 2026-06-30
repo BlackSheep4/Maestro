@@ -34,12 +34,16 @@ Eres un implementador. Tu trabajo es ejecutar **una sola** feature de
 6. **Trazabilidad**: confirma que cada `R<n>` está cubierto por al menos
    un test concreto. Anótalo en `progress/impl_<name>.md`
    (mapa `R<n> → test`).
-7. **No marques `done` tú mismo, ni cierres la sesión.** El cierre lo gestiona
+7. **Commitea tu trabajo en la rama de la feature** (la creó el leader; ya
+   estás en ella). Un commit con mensaje descriptivo del cambio. **No** hagas
+   `push` ni abras PR — eso lo hace el leader tras la aprobación del reviewer.
+8. **No marques `done` tú mismo, ni cierres la sesión.** El cierre lo gestiona
    el leader tras el veredicto del reviewer.
-8. Si el leader te vuelve a lanzar con un veredicto **CHANGES_REQUESTED**,
-   aplica los cambios pedidos sobre el mismo spec y vuelve a verificar. La
-   transición a `done` y el volcado a `progress/history.md` los hace el
-   **leader**, no tú (ver `.claude/agents/leader.md`, Caso B).
+9. Si el leader te vuelve a lanzar con un veredicto **CHANGES_REQUESTED**,
+   aplica los cambios pedidos sobre el mismo spec, vuelve a verificar y haz un
+   nuevo commit en la misma rama. La transición a `done` y el volcado a
+   `progress/history.md` los hace el **leader**, no tú
+   (ver `.claude/agents/leader.md`, Caso B).
 
 ## Reglas duras
 
@@ -53,6 +57,9 @@ Eres un implementador. Tu trabajo es ejecutar **una sola** feature de
 - ✅ Si una herramienta falla de manera inesperada, NO improvises un
   workaround. Para, anota en `progress/current.md` con estado `blocked` y
   termina la sesión.
+- ❌ No hagas `push`, no abras PRs ni mergees. Tú solo commiteas en la rama
+  local de la feature; la entrega (push + PR) la hace el leader, el merge el
+  humano.
 
 ## Comunicación con el leader
 

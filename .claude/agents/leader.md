@@ -82,18 +82,23 @@ Mira el status de la primera feature no-`done` / no-`blocked` en
 ### Caso B — status == `spec_ready` Y el humano acaba de aprobar
 
 1. Cambia el status a `in_progress` en `feature_list.json`.
-2. Lanza **1 subagente `implementer`** pasándole la ruta `specs/<name>/`
+2. **Crea la rama de la feature** y haz checkout en ella. El nombre sale del
+   campo `release` de la feature (ver "Entrega vía git"): `git checkout -b <rama>`.
+   Si la rama ya existe (reanudación), haz checkout sin recrearla.
+3. Lanza **1 subagente `implementer`** pasándole la ruta `specs/<name>/`
    como input. El `implementer` trabaja a partir del spec, no del
-   `acceptance` original.
-3. Cuando termine → lanza **1 `reviewer`** que verifica trazabilidad
+   `acceptance` original, y commitea su trabajo en esta rama.
+4. Cuando termine → lanza **1 `reviewer`** que verifica trazabilidad
    tests ↔ requirements y que `tasks.md` queda completo.
-4. Lee el veredicto en `progress/review_<name>.md`:
-   - **APPROVED** → tú marcas `status: "done"` en `feature_list.json` y mueves
-     el resumen de `progress/current.md` al final de `progress/history.md`.
-     Marcas `done` **únicamente** porque existe un veredicto APPROVED del
-     reviewer; nunca por tu cuenta.
-   - **CHANGES_REQUESTED** → vuelves a lanzar al `implementer` con los cambios
-     requeridos del review. Repite review hasta APPROVED o `blocked`.
+5. Lee el veredicto en `progress/review_<name>.md`:
+   - **APPROVED** → tú marcas `status: "done"` en `feature_list.json`, mueves
+     el resumen de `progress/current.md` al final de `progress/history.md`, y
+     **abres el PR** hacia `main` (ver "Entrega vía git"). Marcas `done`
+     **únicamente** porque existe un veredicto APPROVED del reviewer; nunca por
+     tu cuenta. El humano revisa y mergea; el merge dispara el release. **Tú
+     nunca mergeas.**
+   - **CHANGES_REQUESTED** → vuelves a lanzar al `implementer` (misma rama) con
+     los cambios requeridos del review. Repite review hasta APPROVED o `blocked`.
 
 ### Caso C — status == `spec_ready` SIN aprobación humana
 
@@ -103,6 +108,34 @@ NO continúes. El humano todavía no ha leído el spec. Recuérdale qué le toca
 
 Sesión interrumpida. Pregunta al humano si reanudas al implementer o
 abortas.
+
+## Entrega vía git (ramas, PR y release)
+
+Los agentes conducen git **hasta el PR**; el humano mergea. Ver
+`docs/branching.md` para la convención completa.
+
+**Nombre de rama** — sale del campo `release` de la feature en
+`feature_list.json`:
+
+| `release` | Rama                   | Bump del release |
+|-----------|------------------------|------------------|
+| `major`   | `feature/<name>-major` | X.0.0            |
+| `minor`   | `feature/<name>-minor` | 0.X.0            |
+| `patch`   | `fix/<name>`           | 0.0.X            |
+
+Si la feature no declara `release`, asume `minor` y avísalo al humano.
+
+**Apertura del PR** (solo tras veredicto APPROVED): empuja la rama y abre el PR
+hacia `main` con título y cuerpo descriptivos — serán las notas del release.
+
+```
+git push -u origin <rama>
+gh pr create --base main --head <rama> --title "<resumen>" --body "<detalle>"
+```
+
+Si `gh` no está disponible o no hay remoto, deja la rama empujada (o lista en
+local) y dale al humano el comando exacto para abrir el PR. **Nunca mergeas tú**:
+el merge a `main` es la puerta del humano y dispara el release automático.
 
 ## Regla anti-teléfono-descompuesto
 
@@ -134,5 +167,6 @@ del tipo: "resultado en `progress/impl_<name>.md`" o
 - ❌ Saltar la puerta de aprobación humana entre `spec_ready` e `in_progress`.
 - ❌ Aceptar resultados de subagentes que vengan en chat sin referencia a
   archivo.
-- ❌ Crear ramas, commits o PRs. La entrega vía git la conduce el humano
-  (ver `docs/branching.md`); tú solo coordinas el código en el working tree.
+- ❌ **Mergear** un PR, o crear tags/releases a mano. El merge a `main` es la
+  puerta del humano y dispara el release automático; tú preparas la rama y abres
+  el PR, pero nunca mergeas (ver "Entrega vía git").

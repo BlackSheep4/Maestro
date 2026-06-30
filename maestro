@@ -357,6 +357,21 @@ Puede haber tantas ramas `feature/*` y `fix/*` simultáneas como necesites.
    versión siguiente, crea el tag `vX.Y.Z` y publica el GitHub Release con el
    título y cuerpo de la PR como notas. **1 PR = 1 release.**
 
+## Reparto con los agentes (Maestro)
+
+Si usas el flujo SDD de Maestro, los agentes conducen git **hasta el PR** y tú
+solo mergeas:
+
+1. El **leader** crea la rama al pasar la feature a `in_progress`, con el nombre
+   derivado del campo `release` de `feature_list.json`: `major` →
+   `feature/<x>-major`, `minor` → `feature/<x>-minor`, `patch` → `fix/<x>`
+   (default `minor` si la feature no lo declara).
+2. El **implementer** commitea su trabajo en esa rama.
+3. Tras el veredicto `APPROVED` del **reviewer**, el leader empuja la rama y abre
+   el PR hacia `main`.
+4. **Tú (humano)** revisas y mergeas. El merge dispara el release. Los agentes
+   nunca mergean.
+
 ## Setup del CI por stack
 
 El workflow corre `./init.sh`, que ejecuta los tests del proyecto según

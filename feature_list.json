@@ -12,6 +12,8 @@
       "done",
       "blocked"
     ],
+    "valid_release": ["major", "minor", "patch"],
+    "release_to_branch": "major→feature/<name>-major, minor→feature/<name>-minor, patch→fix/<name> (default minor si la feature no declara release)",
     "sdd_required_when": "feature has \"sdd\": true"
   },
   "features": []

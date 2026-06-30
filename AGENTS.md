@@ -97,17 +97,19 @@ pending → [spec_author] → spec_ready → ⏸ HUMANO → in_progress → [imp
    a `progress/history.md`. Si es `CHANGES_REQUESTED`, el leader relanza al
    implementer con los cambios pedidos.
 
-### Entrega: ramas, PR y release (lo conduce el humano)
+### Entrega: ramas, PR y release
 
-El ciclo SDD de arriba trabaja sobre el working tree y termina en `done`. La
-**entrega** a través de git la conduce el **humano**, no los agentes:
+Los agentes conducen git **hasta el PR**; el humano mergea (la puerta del
+release). Reparto:
 
-- El humano crea la rama según `docs/branching.md` (`feature/<x>-major|minor` o
-  `fix/<x>`), abre el PR hacia `main` y lo mergea.
-- Al mergear, los workflows de `.github/` calculan la versión desde el nombre de
-  rama y publican el GitHub Release automáticamente.
-- Los agentes **no** crean ramas, commits ni PRs: solo dejan el código y los
-  tests verdes en el working tree.
+- El **leader** crea la rama al pasar la feature a `in_progress`, con el nombre
+  derivado del campo `release` de la feature (`major`→`feature/<x>-major`,
+  `minor`→`feature/<x>-minor`, `patch`→`fix/<x>`; default `minor`).
+- El **implementer** commitea su trabajo en esa rama (sin push ni PR).
+- Tras el veredicto `APPROVED`, el **leader** empuja la rama y abre el PR hacia
+  `main` (título y cuerpo = notas del release).
+- El **humano** revisa y mergea; el merge calcula la versión desde el nombre de
+  rama y publica el GitHub Release. **Los agentes nunca mergean.**
 
 Convención y regla de versionado completas en `docs/branching.md`.
 
