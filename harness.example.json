@@ -1,5 +1,5 @@
 {
-  "_comment": "Fichero de referencia para el agente. No editar manualmente. El agente lo consulta al generar harness.json mediante asunción dinámica.",
+  "_comment": "Fichero de referencia para el agente. No editar manualmente. El agente lo consulta al generar harness.json mediante asunción dinámica. El bloque opcional 'ci' (con 'ci.setup') declara un comando de preparación que el workflow de CI ejecuta antes de ./init.sh; omítelo si el runner ya trae el toolchain.",
   "examples": {
     "python": {
       "stack": {
@@ -38,6 +38,9 @@
         "test_cmd": "npm test",
         "src_dir": "src",
         "test_dir": "tests"
+      },
+      "ci": {
+        "setup": "npm ci"
       }
     },
     "go": {
@@ -59,6 +62,9 @@
         "test_cmd": "cargo test",
         "src_dir": "src",
         "test_dir": "tests"
+      },
+      "ci": {
+        "setup": "cargo build"
       }
     }
   }

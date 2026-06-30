@@ -156,6 +156,232 @@ cmd_init() {
     copied+=("$rel")
   done < <(cd "$TEMPLATES" && find . -type f | sed 's|^\./||' | sort)
 
+  # ── Flujo PR→CI→release (generado, no copiado de templates) ──
+  # Define el ciclo de contribución del PROYECTO (ramas tipadas → PR → gate
+  # ./init.sh → release automático), distinto del CI propio de Maestro. Se
+  # generan aquí en vez de copiarse para no colisionar con el .github de Maestro.
+  # No se sobreescriben si el proyecto ya los tiene.
+  mkdir -p .github/workflows docs
+
+  if [ ! -e .github/workflows/ci.yml ]; then
+    cat > .github/workflows/ci.yml <<'CI_YML_EOF'
+name: CI
+
+# Espejo en CI del gate local del harness (./init.sh) + lint del nombre de rama.
+# Stack-agnóstico: ./init.sh lee harness.json y ejecuta los tests del proyecto.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar el nombre de la rama
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          if echo "$BRANCH" | grep -qE '^(feature/.+-(major|minor)|fix/.+)$'; then
+            echo "✅ Nombre de rama válido: $BRANCH"
+          else
+            echo "❌ Nombre de rama inválido: $BRANCH"
+            echo "Usa una de estas convenciones:"
+            echo "  feature/<nombre>-major   → release X.0.0"
+            echo "  feature/<nombre>-minor   → release 0.X.0"
+            echo "  fix/<nombre>             → release 0.0.X"
+            exit 1
+          fi
+
+  harness-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup del stack (harness.json → ci.setup)
+        run: |
+          if [ -f harness.json ] && command -v jq >/dev/null 2>&1; then
+            SETUP=$(jq -r '.ci.setup // ""' harness.json 2>/dev/null || true)
+            if [ -n "$SETUP" ] && [ "$SETUP" != "null" ]; then
+              echo "▶ ci.setup: $SETUP"
+              bash -c "$SETUP"
+            else
+              echo "ℹ Sin ci.setup; uso los runtimes preinstalados del runner."
+            fi
+          fi
+
+      - name: Gate del harness (./init.sh)
+        run: |
+          if [ ! -f harness.json ]; then
+            echo "⚠ harness.json ausente: el harness aún no está configurado. Se omite el gate."
+            exit 0
+          fi
+          chmod +x init.sh
+          ./init.sh
+CI_YML_EOF
+    copied+=(".github/workflows/ci.yml")
+  fi
+
+  if [ ! -e .github/workflows/release.yml ]; then
+    cat > .github/workflows/release.yml <<'RELEASE_YML_EOF'
+name: Release
+
+# Se dispara al MERGEAR una PR a main. Calcula el bump desde el nombre de rama
+# (regla dura), crea el tag y publica el GitHub Release con las notas del PR.
+# 1 PR = 1 release. La fuente de verdad de la versión son los tags git.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # La rama base (main) ya incluye el merge: el tag debe caer en su tip,
+          # no en el merge-ref del PR que checkout saca por defecto.
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Calcular versión siguiente desde el nombre de rama
+        id: compute
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          case "$BRANCH" in
+            feature/*-major) LEVEL=major ;;
+            feature/*-minor) LEVEL=minor ;;
+            fix/*)           LEVEL=patch ;;
+            *)
+              echo "ℹ Rama '$BRANCH' no dispara release. Se omite."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0 ;;
+          esac
+          LATEST=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+          [ -z "$LATEST" ] && LATEST="v0.0.0"
+          CUR="${LATEST#v}"
+          MAJOR="${CUR%%.*}"; REST="${CUR#*.}"; MINOR="${REST%%.*}"; PATCH="${REST##*.}"
+          case "$LEVEL" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH+1)) ;;
+          esac
+          NEW="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "next=$NEW" >> "$GITHUB_OUTPUT"
+          echo "▶ $BRANCH ($LEVEL): $LATEST → $NEW"
+
+      - name: Crear y empujar el tag
+        if: steps.compute.outputs.skip == 'false'
+        run: |
+          NEW="${{ steps.compute.outputs.next }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$NEW"
+          git push origin "$NEW"
+
+      - name: Publicar GitHub Release
+        if: steps.compute.outputs.skip == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.compute.outputs.next }}
+          name: ${{ steps.compute.outputs.next }}
+          body: |
+            ${{ github.event.pull_request.title }}
+
+            ${{ github.event.pull_request.body }}
+          draft: false
+          prerelease: false
+RELEASE_YML_EOF
+    copied+=(".github/workflows/release.yml")
+  fi
+
+  if [ ! -e .github/PULL_REQUEST_TEMPLATE.md ]; then
+    cat > .github/PULL_REQUEST_TEMPLATE.md <<'PR_TPL_EOF'
+## Qué hace este PR
+
+<!-- Descripción breve. El TÍTULO y este cuerpo se usan como notas del release. -->
+
+## Tipo de cambio
+
+El nivel de versión se deduce del **nombre de la rama**, no de aquí:
+
+- `feature/<x>-major` → release mayor (rompe compatibilidad)
+- `feature/<x>-minor` → release minor (funcionalidad nueva compatible)
+- `fix/<x>` → release patch (corrección)
+
+## Checklist
+
+- [ ] El nombre de la rama sigue la convención (`feature/<x>-major|minor` o `fix/<x>`).
+- [ ] El gate del harness pasa en local (`./init.sh` en verde).
+- [ ] El título y la descripción de esta PR sirven como notas de release.
+PR_TPL_EOF
+    copied+=(".github/PULL_REQUEST_TEMPLATE.md")
+  fi
+
+  if [ ! -e docs/branching.md ]; then
+    cat > docs/branching.md <<'BRANCHING_EOF'
+# Convención de ramas y releases
+
+Este proyecto usa un flujo **PR → CI → release automático**. El nivel de versión
+NO se decide a mano: se deduce del **nombre de la rama**.
+
+## Tipos de rama
+
+| Rama | Para qué | Efecto en el release |
+|------|----------|----------------------|
+| `feature/<nombre>-major` | Cambio que rompe compatibilidad | `X`.0.0 (mayor +1, resetea minor y patch) |
+| `feature/<nombre>-minor` | Funcionalidad nueva compatible | 0.`X`.0 (minor +1, resetea patch) |
+| `fix/<nombre>` | Corrección | 0.0.`X` (patch +1) |
+
+Ejemplos: `v1.4.2` + `feature/login-major` → `v2.0.0`;
+`v1.4.2` + `feature/login-minor` → `v1.5.0`;
+`v1.4.2` + `fix/typo` → `v1.4.3`.
+
+Puede haber tantas ramas `feature/*` y `fix/*` simultáneas como necesites.
+
+## Ciclo
+
+1. Crea tu rama con la convención de arriba.
+2. Abre una PR hacia `main`.
+3. El CI (`.github/workflows/ci.yml`) valida el nombre de rama y ejecuta el
+   gate del harness (`./init.sh`) — el mismo que corres en local.
+4. Al **mergear** la PR a `main`, `.github/workflows/release.yml` calcula la
+   versión siguiente, crea el tag `vX.Y.Z` y publica el GitHub Release con el
+   título y cuerpo de la PR como notas. **1 PR = 1 release.**
+
+## Setup del CI por stack
+
+El workflow corre `./init.sh`, que ejecuta los tests del proyecto según
+`harness.json`. Si tu stack necesita un paso de preparación antes de los tests
+(instalar dependencias, compilar), declara un comando opcional en `harness.json`:
+
+```json
+{
+  "stack": { "language": "node", "test_cmd": "npm test", "...": "..." },
+  "ci": { "setup": "npm ci" }
+}
+```
+
+El workflow lo ejecuta antes de `./init.sh`. Si lo omites, usa los runtimes
+preinstalados del runner (`ubuntu-latest` trae Python, Node y Go).
+
+## Primer release
+
+Si no hay ningún tag aún, el primer release parte de `v0.0.0`: una rama `fix/*`
+produce `v0.0.1`, una `feature/*-minor` produce `v0.1.0`, una `feature/*-major`
+produce `v1.0.0`.
+BRANCHING_EOF
+    copied+=("docs/branching.md")
+  fi
+
   local f
   for f in init.sh .claude/hooks/after_edit.sh .claude/hooks/before_stop.sh; do
     [ -f "$f" ] && chmod +x "$f"
