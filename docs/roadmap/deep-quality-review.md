@@ -1,63 +1,66 @@
-# Roadmap: Profundidad de la revisión de calidad (juicio + huecos seguridad/rendimiento)
+# Roadmap: Mandato de tests enriquecido (el agente ESCRIBE más tipos de test)
 
-> Estado: **anotada, sin definir del todo.** Captura los huecos detectados el
-> 2026-07-01; **falta una pasada de definición** (decisiones con AskUserQuestion)
-> antes de implementar. Extiende [ci-quality-gate](ci-quality-gate.md): añade
-> tools al catálogo de `checks` **y** convierte parte de la calidad en *juicio*
-> del `reviewer`, no solo enforcement mecánico. Debe ir **después** de
-> ci-quality-gate.
+> Estado: **anotada, sin definir del todo.** Necesita una pasada de definición
+> (AskUserQuestion) antes de implementar. Extiende [ci-quality-gate](ci-quality-gate.md),
+> pero por un **eje distinto**: ci-quality-gate es enforcement **mecánico**
+> (linters/escáneres en `init.sh`); esto es lo que el **agente autor de tests
+> escribe**.
 
-## Contexto: qué cubre hoy el flujo SDD (tres capas)
+## Qué se quiere (intención del humano)
 
-1. **Tests — instruido explícitamente.** Unitarios (feliz + error), integración
-   (interfaces, recurso real no mocks), smoke e2e, trazabilidad `R<n>→test`.
-   Nativo y fuerte (`docs/verification.md`, implementer, reviewer, CHECKPOINTS).
-2. **Convenciones/arquitectura — juicio del reviewer, pero project-specific.** El
-   reviewer rechaza contra `docs/conventions.md` (estilo, linter, nombres,
-   errores) y `docs/architecture.md`. El contenido lo rellena el humano/explorer.
-3. **Calidad automática — mecánica.** El gate de `checks` en `init.sh`
-   (ci-quality-gate) corre lint/format/typecheck/deadcode/complejidad/seguridad.
-   No es juicio: `init.sh` se pone rojo si el tool detecta algo.
+Que el agente que redacta y escribe los tests (el `implementer`, guiado por el
+`spec_author`, `docs/verification.md` y el `reviewer`) **tenga que producir una
+batería de tests más completa y categorizada**, no solo "un test por función".
+En concreto:
 
-## Huecos detectados (lo que motiva esta feature)
+- **Unitarios con cobertura objetivo (≥ 80%)** — no basta con "hay un test"; hay
+  un umbral de cobertura que cumplir.
+- **Integración** — ya existe como Nivel 2, se mantiene/refuerza.
+- **Seguridad** — tests que verifican propiedades de seguridad: input malicioso
+  rechazado/saneado, authz (usuario A no accede a recurso de B), secretos no se
+  loguean/filtran.
+- **Rendimiento / optimización** — tests que verifican presupuestos: latencia
+  máxima, nº de llamadas/queries (evitar N+1), cotas de complejidad.
+- **etc.** (la lista es ampliable por categoría).
 
-- **Seguridad = solo escaneo de dependencias** (pip-audit/npm audit). Falta:
-  secretos hardcodeados, SAST (inyección, patrones inseguros), y **el reviewer no
-  está instruido para razonar sobre seguridad** (authz, inyección).
-- **Optimización / rendimiento: no lo cubre nadie.** Ni tool ni instrucción de
-  agente. Hueco total.
-- **Código muerto y complejidad son mecánicos-only.** Los tumba el tool, pero el
-  reviewer no ejerce *juicio* sobre ellos.
+## En qué se traduce (dónde toca)
 
-## Dos direcciones (probablemente ambas)
-
-**(a) Ampliar el catálogo de `checks`** (enforcement mecánico):
-- Escaneo de secretos: `gitleaks` (multi-lenguaje) sobre el árbol.
-- SAST ligero: `bandit` (Python), `semgrep` (multi-lenguaje con rulesets).
-- Se añaden como checks nuevos (`secrets`, `sast`) al catálogo por lenguaje de
-  `harness.example.json`; `init.sh` ya los corre.
-
-**(b) Rúbrica de revisión explícita en `reviewer.md`** (juicio, no tool):
-- Añadir dimensiones que el reviewer DEBE considerar y citar (fichero:línea):
-  seguridad (inyección, authz, secretos, manejo de input no confiable) y
-  rendimiento (algoritmos O(n²) evitables, I/O en bucles, queries N+1).
-- Posiblemente también que `spec_author` anote consideraciones de seguridad/
-  rendimiento en `design.md` cuando la feature las tenga.
+- **`docs/verification.md`** — ampliar los "Niveles de verificación": unitarios
+  **con umbral de cobertura**, integración, seguridad, rendimiento. Definir qué
+  significa cada categoría y cuándo aplica.
+- **`spec_author`** — al redactar el spec, **decide qué categorías de test aplican
+  a esa feature** (no toda feature necesita test de rendimiento o seguridad) y las
+  incluye en `tasks.md`/`requirements.md`.
+- **`implementer`** — escribe los tests de cada categoría aplicable, no solo
+  unitarios.
+- **`reviewer`** — **enforcea**: exige las categorías spec-eadas y el **umbral de
+  cobertura** (rechaza si < 80% o si falta una categoría requerida).
+- **`harness.json`** — comando de cobertura (stack-specific: `pytest --cov`,
+  `jest --coverage`, `go test -cover`) y umbral; posiblemente `init.sh` lo verifica.
+- **`feature_list.json` (rules)** — `min_coverage: 80` como regla configurable.
 
 ## Decisiones abiertas (para la pasada de definición)
 
-- **Tooling de seguridad:** ¿gitleaks + semgrep (multi-lenguaje) o bandit
-  (Python-only) según stack? ¿Ambos? ¿severidad block o warn?
-- **Rendimiento:** difícil de automatizar (contextual). ¿Solo rúbrica del
-  reviewer, o también un harness de benchmarks (pesado → fase 2+)?
-- **Rúbrica del reviewer:** ¿checklist prescriptivo o juicio abierto? Riesgo de
-  ruido / falsos positivos si es demasiado estricto.
-- **Dónde encaja:** ¿solo `reviewer`, o también `spec_author` (notas en design)?
-- **Alcance:** proyectos generados (como el resto de features de esta línea).
+- **Cobertura:** ¿80% global o por-módulo? ¿medida con qué comando (stack-specific
+  en `harness.json`)? ¿la verifica `init.sh` (gate) o solo el reviewer?
+- **Categorías obligatorias vs condicionales:** seguridad/rendimiento no aplican a
+  toda feature. ¿Quién decide la aplicabilidad? (propuesta: el `spec_author`, por
+  feature, y el humano lo aprueba en la puerta del spec).
+- **Tests de rendimiento:** presupuestos de tiempo son **flaky** en CI. ¿Aserciones
+  sobre nº de llamadas/complejidad (más estables) o benchmark con umbral de
+  regresión (pesado)?
+- **Tests de seguridad:** ¿qué patrones concretos por categoría (inyección, authz,
+  secretos)? Hará falta guía/ejemplos en `verification.md` para que el agente sepa
+  qué escribir.
+- **Alcance:** proyectos generados (como el resto de la línea de calidad).
 
-## Relación / orden
+## Relación
 
-- Depende de **ci-quality-gate** (extiende su catálogo de `checks` y su
-  `docs/verification.md` Nivel 5, y toca `reviewer.md`).
-- Encaja como fase 3 de la línea de calidad; no arrancar hasta que
-  ci-quality-gate esté mergeado.
+- **Complementa** a ci-quality-gate: aquello es calidad **mecánica** (el tool
+  detecta), esto es calidad **autorada** (el agente escribe el test). Van juntas
+  pero son ejes distintos.
+- La idea de escáneres de seguridad (gitleaks/semgrep) y la rúbrica de juicio del
+  reviewer que se barajó antes son **otra cosa** (enforcement mecánico + revisión);
+  si se quieren, encajan mejor como fase 2 de ci-quality-gate, no aquí.
+- Ir **después** de ci-quality-gate (reusa su `verification.md` Nivel 5 y el
+  esquema de `harness.json`).
